@@ -13,6 +13,7 @@ flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/
 systemctl enable ufw.service || true
 systemctl enable unattended-upgrades.service || true
 systemctl enable NetworkManager.service || true
+systemctl enable rc-local || true
 
 # Magyar alapbeállítások a telepített rendszerhez
 echo "Europe/Budapest" > /etc/timezone
