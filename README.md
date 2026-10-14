@@ -1,17 +1,13 @@
-# Kolibri Linux (Debian 13 + Xfce)
+# Kolibri Linux
 
-Build (Debian/Ubuntu gazdán, kb. 15 GB szabad hely, internet):
+Build:
 
     sudo ./build.sh
-
-Az eredmény: `kolibri-amd64.hybrid.iso`.
 
 Kipróbálás VM-ben (UEFI):
 
     qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 \
       -bios /usr/share/ovmf/OVMF.fd -cdrom kolibri-amd64.hybrid.iso
-
-Pendrive: `sudo dd if=kolibri-amd64.hybrid.iso of=/dev/sdX bs=4M status=progress conv=fsync`
 
 Testreszabás: csomagok a `config/package-lists/`, beállítások a `config/includes.chroot/`, build-hookok a `config/hooks/live/` alatt.
 
@@ -19,7 +15,7 @@ Testreszabás: csomagok a `config/package-lists/`, beállítások a `config/incl
 
 - `tools/gen_assets.py` újragenerálja a képeket (Plymouth logó, GRUB háttér 1920x1080, syslinux 640x480). Előnézet: `tools/preview/`.
 - Plymouth téma: `config/includes.chroot/usr/share/plymouth/themes/kolibri/`
-  - kipróbálás: az ISO-t VM-ben indítva (a gazdagép initramfs-ét ne módosítsd vele)
+- kipróbálás: az ISO-t VM-ben indítva
 - GRUB (telepített rendszer): `config/includes.chroot/etc/default/grub.d/zz-kolibri.cfg`
 - Élő ISO menü: `config/bootloaders/{grub-pc,syslinux}/splash.png`
 
