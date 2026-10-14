@@ -27,14 +27,28 @@ firefox-esr-l10n-hu
 firefox-esr
 thunderbird
 thunderbird-l10n-hu
+birdtray
 vlc
 evince
 ristretto
 simple-scan
+mc
+rsync
+gimp
+wireguard
+wireguard-tools
+mugshot
+onionshare
+deluge
+gocryptfs
+age
+
 
 # --- Nyomtatás ---
 cups
+printer-driver-cups-pdf
 system-config-printer
+blueman
 
 # --- Szoftverkezelés ---
 flatpak
@@ -50,7 +64,7 @@ timeshift
 gparted
 smartmontools
 
-# --- Firmware és codecek ---
+# --- Firmware és codecek, system-tools ---
 firmware-linux
 firmware-misc-nonfree
 firmware-iwlwifi
@@ -64,8 +78,15 @@ gstreamer1.0-libav
 gstreamer1.0-plugins-good
 gstreamer1.0-plugins-bad
 gstreamer1.0-plugins-ugly
-
-# --- Telepítő (csak live környezetben kell) ---
+gvfs-fuse
+gvfs-backends
+nfs-common
+samba
+smbclient
+cifs-utils
+ttf-mscorefonts-installer
+libpam-google-authenticator
+btop
 
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin
