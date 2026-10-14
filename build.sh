@@ -33,4 +33,4 @@ lb config
 lb build 2>&1 | tee build.log
 ls -lh ./*.iso
 
-DATUM=`date +%y.%m`; mv kolibri-amd64.hybrid.iso KolibiriLinux-$DATUM-amd64.iso; md5sum KolibiriLinux-$DATUM-amd64.iso > KolibiriLinux-$DATUM-amd64.iso.md5; chown -R majorsza:majorsza KolibiriLinux-*
+DATUM=`date +%y.%m`; mv kolibri-amd64.hybrid.iso KolibriLinux-$DATUM-amd64.iso; md5sum KolibriLinux-$DATUM-amd64.iso > KolibriLinux-$DATUM-amd64.iso.md5; chown -R majorsza:majorsza KolibriLinux-*
