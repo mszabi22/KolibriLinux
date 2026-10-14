@@ -87,6 +87,7 @@ cifs-utils
 ttf-mscorefonts-installer
 libpam-google-authenticator
 btop
+ssh
 
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin

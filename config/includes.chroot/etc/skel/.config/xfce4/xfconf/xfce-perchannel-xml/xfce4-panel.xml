@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.1" encoding="UTF-8"?>
+
 <channel name="xfce4-panel" version="1.0">
   <property name="configver" type="int" value="2"/>
   <property name="panels" type="array">
@@ -13,7 +14,6 @@
       <property name="plugin-ids" type="array">
         <value type="int" value="1"/>
         <value type="int" value="2"/>
-        <value type="int" value="3"/>
         <value type="int" value="4"/>
         <value type="int" value="5"/>
         <value type="int" value="6"/>
@@ -21,20 +21,35 @@
         <value type="int" value="8"/>
         <value type="int" value="9"/>
         <value type="int" value="10"/>
-        <value type="int" value="11"/>
       </property>
     </property>
   </property>
   <property name="plugins" type="empty">
-    <property name="plugin-1" type="string" value="whiskermenu"/>
+    <property name="plugin-1" type="string" value="whiskermenu">
+      <property name="button-icon" type="string" value="/usr/share/kolibri/logo.png"/>
+      <property name="launcher-show-description" type="bool" value="false"/>
+      <property name="view-mode" type="int" value="1"/>
+      <property name="favorites-in-recent" type="bool" value="true"/>
+      <property name="position-search-alternate" type="bool" value="true"/>
+      <property name="position-categories-alternate" type="bool" value="true"/>
+      <property name="favorites" type="array">
+        <value type="string" value="firefox-esr.desktop"/>
+        <value type="string" value="xfce4-file-manager.desktop"/>
+        <value type="string" value="libreoffice-writer.desktop"/>
+        <value type="string" value="libreoffice-calc.desktop"/>
+        <value type="string" value="org.keepassxc.KeePassXC.desktop"/>
+        <value type="string" value="signal-desktop.desktop"/>
+        <value type="string" value="com.tutanota.Tutanota.desktop"/>
+        <value type="string" value="org.localsend.localsend_app.desktop"/>
+      </property>
+      <property name="menu-height" type="int" value="676"/>
+      <property name="recent" type="array">
+        <value type="string" value="xfce4-terminal.desktop"/>
+      </property>
+    </property>
     <property name="plugin-2" type="string" value="launcher">
       <property name="items" type="array">
         <value type="string" value="16000000001.desktop"/>
-      </property>
-    </property>
-    <property name="plugin-3" type="string" value="launcher">
-      <property name="items" type="array">
-        <value type="string" value="16000000002.desktop"/>
       </property>
     </property>
     <property name="plugin-4" type="string" value="tasklist">
@@ -50,6 +65,9 @@
     </property>
     <property name="plugin-6" type="string" value="systray">
       <property name="square-icons" type="bool" value="true"/>
+      <property name="known-legacy-items" type="array">
+        <value type="string" value="a vezetékes hálózati kapcsolat („1. vezetékes kapcsolat”) aktív"/>
+      </property>
     </property>
     <property name="plugin-7" type="string" value="pulseaudio">
       <property name="enable-keyboard-shortcuts" type="bool" value="true"/>
@@ -58,10 +76,9 @@
     <property name="plugin-9" type="string" value="notification-plugin"/>
     <property name="plugin-10" type="string" value="clock">
       <property name="mode" type="uint" value="2"/>
-      <property name="digital-layout" type="uint" value="3"/>
-      <property name="digital-time-format" type="string" value="%H:%M"/>
+      <property name="digital-layout" type="uint" value="0"/>
+      <property name="digital-time-format" type="string" value="%T"/>
       <property name="digital-date-format" type="string" value="%Y.%m.%d."/>
     </property>
-    <property name="plugin-11" type="string" value="showdesktop"/>
   </property>
 </channel>
