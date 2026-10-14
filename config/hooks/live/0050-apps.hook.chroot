@@ -19,9 +19,9 @@ if ls /opt/kolibri-debs/veracrypt-*.deb >/dev/null 2>&1; then
 fi
 rm -rf /opt/kolibri-debs
 
-# Brave legyen az alapértelmezett böngésző
-update-alternatives --set x-www-browser /usr/bin/brave-browser || true
-update-alternatives --set gnome-www-browser /usr/bin/brave-browser || true
+# Firefox legyen az alapértelmezett böngésző
+update-alternatives --set x-www-browser /usr/bin/firefox || true
+update-alternatives --set gnome-www-browser /usr/bin/firefox || true
 
 # Flatpak: Tuta Mail és LocalSend (ha itt nem sikerül, első indításkor pótolja a szolgáltatás)
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
@@ -31,6 +31,6 @@ else
     echo "FIGYELEM: Flatpak előtelepítés sikertelen, első indításkor pótolódik."
 fi
 
-systemctl enable kolibri-ufw.service kolibri-flatpak-apps.service || true
+systemctl enable kolibri-ufw.service kolibri-flatpak-apps.service rc-local || true
 apt-get clean
 exit 0
