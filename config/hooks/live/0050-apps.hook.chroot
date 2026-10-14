@@ -20,8 +20,8 @@ fi
 rm -rf /opt/kolibri-debs
 
 # Firefox legyen az alapértelmezett böngésző
-update-alternatives --set x-www-browser /usr/bin/firefox || true
-update-alternatives --set gnome-www-browser /usr/bin/firefox || true
+update-alternatives --set x-www-browser /usr/bin/firefox-esr || true
+update-alternatives --set gnome-www-browser /usr/bin/firefox-esr || true
 
 # Flatpak: Tuta Mail és LocalSend (ha itt nem sikerül, első indításkor pótolja a szolgáltatás)
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
