@@ -42,6 +42,7 @@ onionshare
 deluge
 gocryptfs
 age
+audacious
 
 
 # --- Nyomtatás ---
@@ -88,6 +89,7 @@ ttf-mscorefonts-installer
 libpam-google-authenticator
 btop
 ssh
+gparted
 
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin
