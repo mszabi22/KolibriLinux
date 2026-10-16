@@ -9,10 +9,6 @@ fi
 
 hostnamectl set-hostname $1
 
-#echo "Install..."
-#apt -y install realmd sssd sssd-tools libnss-sss libpam-sss adcli samba-common-bin oddjob oddjob-mkhomedir packagekit 
-#dnf -y install realmd sssd oddjob oddjob-mkhomedir adcli samba-common-tools
-
 realm discover samba.crnl.lan
 realm join --user=mszabi samba.crnl.lan
 id mszabi@samba.crnl.lan

@@ -91,6 +91,17 @@ btop
 ssh
 gparted
 
+realmd
+sssd
+sssd-tools
+libnss-sss
+libpam-sss
+adcli
+samba-common-bin
+oddjob
+oddjob-mkhomedir
+packagekit 
+
 # --- Windows-szerű asztal ---
 xfce4-whiskermenu-plugin
 xfce4-pulseaudio-plugin
