@@ -1,8 +1,0 @@
-[Plymouth Theme]
-Name=Kolibri
-Description=Kolibri Linux indítóképernyő: letisztult, nyugodt, haladásjelzővel
-ModuleName=script
-
-[script]
-ImageDir=/usr/share/plymouth/themes/kolibri
-ScriptFile=/usr/share/plymouth/themes/kolibri/kolibri.script
