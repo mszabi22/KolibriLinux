@@ -1,0 +1,11 @@
+#!/bin/bash
+# Az ISO indítómenüjében mindenhol "Kolibri Linux" szerepeljen.
+D=binary; [ -d "$D/boot" ] || D=.
+files=$(ls "$D"/boot/grub/*.cfg "$D"/boot/grub/*/*.cfg "$D"/boot/grub/live-theme/theme.txt \
+           "$D"/isolinux/*.cfg "$D"/isolinux/*.txt 2>/dev/null || true)
+for f in $files; do
+  sed -i -e 's/Debian GNU\/Linux/Kolibri Linux/g' \
+         -e 's/Debian Live/Kolibri Linux/g' \
+         -e 's/Live system/Kolibri Linux - Live/g' "$f"
+done
+exit 0
