@@ -43,6 +43,7 @@ deluge
 gocryptfs
 age
 audacious
+screen
 
 
 # --- Nyomtatás ---
@@ -90,7 +91,6 @@ libpam-google-authenticator
 btop
 ssh
 gparted
-
 realmd
 sssd
 sssd-tools
