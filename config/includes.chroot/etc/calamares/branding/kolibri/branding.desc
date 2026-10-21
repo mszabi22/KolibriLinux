@@ -11,9 +11,9 @@ windowPlacement:    center
 strings:
     productName:         Kolibri Linux
     shortProductName:    Kolibri
-    version:             1.0
-    shortVersion:        1.0
-    versionedName:       Kolibri Linux 1.0
+    version:             26.10
+    shortVersion:        26.10
+    versionedName:       Kolibri Linux 26.10
     shortVersionedName:  Kolibri Linux 26.10
     bootloaderEntryName: Kolibri Linux
     productUrl:          "https://sleepy.hu"
