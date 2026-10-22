@@ -60,10 +60,7 @@ A rendszer iskolai és oktatási környezetbe készült, de bárki használhatja
 
 ## Letöltés és telepítés
 
-Az ISO-képfájl és a telepítési útmutató a projekt weboldalán érhető el:
-
-- Letöltés: <https://sleepy.hu/letoltes.php>
-- Telepítési útmutató: <https://sleepy.hu/telepites.php>
+Az ISO-képfájl és a telepítési útmutató a projekt weboldalán érhető el.
 
 Az ISO-fájlt írhatod USB-meghajtóra, vagy indíthatod virtuális gépből. Telepítés nélkül, élő rendszerként is kipróbálható.
 
@@ -90,7 +87,7 @@ A repó szerkezete:
 
 ```bash
 qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 \
-  -bios /usr/share/ovmf/OVMF.fd -cdrom ciszterci-amd64.hybrid.iso
+  -bios /usr/share/ovmf/OVMF.fd -cdrom kolibri-amd64.hybrid.iso
 ```
 
 ### Testreszabás
@@ -104,15 +101,15 @@ qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 \
 ## Arculat
 
 - `tools/gen_assets.py` újragenerálja a képeket: Plymouth logó, GRUB háttér (1920×1080), syslinux háttér (640×480). Az előnézet a `tools/preview/` mappában található.
-- Plymouth téma: `config/includes.chroot/usr/share/plymouth/themes/ciszterci/`
-- GRUB (telepített rendszer): `config/includes.chroot/etc/default/grub.d/zz-ciszterci.cfg`
+- Plymouth téma: `config/includes.chroot/usr/share/plymouth/themes/kolibri/`
+- GRUB (telepített rendszer): `config/includes.chroot/etc/default/grub.d/zz-kolibri.cfg`
 - Élő ISO menü: `config/bootloaders/{grub-pc,syslinux}/splash.png`
 - Az arculati változtatások kipróbálásához indítsd el az ISO-t virtuális gépben.
 
 ## Asztal és alkalmazások
 
 - **Elrendezés.** Windows-szerű: alul tálca, balra Start menü (Whisker menü, Super gomb), jobbra tálcaikonok, hangerő, akkumulátor, óra és az „asztal megjelenítése" gomb. `Win+E` a fájlkezelő. A beállítások helye: `config/includes.chroot/etc/skel/.config/xfce4/`
-- **Háttér és bejelentkező képernyő.** Ugyanaz a kép, mint a GRUB-ban: `/usr/share/backgrounds/ciszterci/background.png`
+- **Háttér és bejelentkező képernyő.** Ugyanaz a kép, mint a GRUB-ban: `/usr/share/backgrounds/kolibri/background.png`
 - **Alkalmazások letöltése.** A `build.sh` és a `config/hooks/live/0050-apps.hook.chroot` tartalmazza a külső forrásból érkező programok telepítését.
 - **LocalSend.** A tűzfal az 53317-es portot csak a helyi (privát) hálózatokról engedi (`kolibri-ufw.service`).
 - **VeraCrypt.** A `.deb` csomag nem frissül magától: új verzióhoz új ISO kell, vagy kézi telepítés.
