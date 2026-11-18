@@ -963,10 +963,10 @@ def gui_main(helper=None, run=True):
             b = self.mk_page("Tartományba léptetés",
                              "A műveletek terminálban futnak, rendszergazdai jelszót kér a rendszer.")
             self.script_row(b, "Belépés SAMBA-DC tartományba",
-                            "A meglévő linux-ad-member.sh futtatása.", "ad_join", "Indítás terminálban")
+                            "A meglévő linux-ad-member.sh futtatása.", "ad_join", "Tartományba lépés")
             self.script_row(b, "Kilépés a SAMBA-DC tartományból",
                             "A tartománytagság és a beléptetéskor létrehozott helyi beállítások eltávolítása.",
-                            "ad_leave", "Kilépés terminálban",
+                            "ad_leave", "Kilépés a tartományból",
                             "Biztosan kilépteted ezt a gépet a samba.crnl.lan tartományból?")
             return b
 
