@@ -1,5 +1,5 @@
 Yast-szerű beállító felület elkészítése a szükséges jogok használatával, hogy az egyszerű felhasználó betudja állítani.
-Az elkészült felület legyen elréhető a Rendszer -> Kolibri Admin menüpontban
+Az elkészült felület legyen elréhető a Rendszer -> Kolibri Admin menüpontban. Script első futtatásakor telepítse amire szüksége van.
 
 Kolibri Admin
 -> Bejelentkező ablak beállítása
