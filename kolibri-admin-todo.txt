@@ -1,7 +1,7 @@
 Yast-szerű beállító felület elkészítése a szükséges jogok használatával, hogy az egyszerű felhasználó betudja állítani.
 Az elkészült felület legyen elréhető a Rendszer -> Kolibri Admin menüpontban. Script első futtatásakor telepítse amire szüksége van.
 
-Kolibri Admin
+Kolibri Vezérlőpult
 -> Bejelentkező ablak beállítása
 	- Elrejtse/mutassa a felhasználót
 	- "Fejlécben" megjelenő információk, pl. dátum, idő formátum megjelenítési módok
@@ -18,6 +18,7 @@ Kolibri Admin
 -> Rendszeridő
 	- Internetes idő szinkron (chrony telepítése, beállítása)
 	- Rendszeridő kézi beállítása
--> Rendszergazdai eszközök
+-> Rendszer
 	- Rendszergazdai eszközök telepítése (meglévő /usr/local/bin/add-admin-tools.sh futtatása terminálban szükséges root jogokkal)
 	- Rendszergazdai eszközök eltávolítása (ehhez mutatom majd az add-admin-tools.sh tartalmát, hogy tudd, mit kell eltávolítani)
+	- Szükségtelen kernelek törlése (meglévő /usr/local/bin/old-kernel-remover futtatása terminálban szükséges root jogokkal)
