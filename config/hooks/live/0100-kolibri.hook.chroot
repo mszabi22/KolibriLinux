@@ -10,7 +10,7 @@ echo "Kolibri Linux \n \l" > /etc/issue
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || true
 
 # Biztonsági szolgáltatások induláskor
-systemctl enable ufw.service || true
+#systemctl enable ufw.service || true
 systemctl enable unattended-upgrades.service || true
 systemctl enable NetworkManager.service || true
 systemctl enable rc-local || true

@@ -60,8 +60,8 @@ gnome-software-plugin-flatpak
 # --- Stabilitás, biztonság, visszaállítás ---
 unattended-upgrades
 apt-listchanges
-ufw
-gufw
+#ufw
+#gufw
 timeshift
 gparted
 smartmontools
@@ -122,3 +122,15 @@ geany
 geany-plugins
 kleopatra
 nextcloud-desktop
+
+# --- Kolibri tűzfal függőségek ---
+python3
+python3-gi
+gir1.2-gtk-3.0
+iptables
+iptables-persistent
+pkexec
+policykit-1-gnome
+polkit-1-gnome
+xfce-polkit
+lxpolkit
