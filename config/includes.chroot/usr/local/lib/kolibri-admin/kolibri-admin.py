@@ -31,7 +31,7 @@ SCRIPTS = {
 
 DESKTOP_FILE = (
     "[Desktop Entry]\nVersion=1.0\nType=Application\n"
-    "Name=Kolibri Admin\nGenericName=Vezérlőpult\n"
+    "Name=Kolibri Vezérlőpult\nGenericName=Vezérlőpult\n"
     "Comment=Kolibri Vezérlőpult – bejelentkező ablak, távoli segítség, tartomány, idő, rendszer\n"
     "Exec=/usr/local/bin/kolibri-admin\nIcon=kolibri-admin\nTerminal=false\n"
     "Categories=System;\nKeywords=admin;vezérlőpult;beállítások;bejelentkezés;tartomány;idő;\n")
