@@ -41,8 +41,8 @@ ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
 # Gyakori portok -> a megjegyzés rovatba kerülő rövid név
 SERVICES = {
     21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns", 67: "dhcp-szerver", 68: "dhcp",
-    69: "tftp", 80: "http", 110: "pop3", 123: "ntp", 139: "netbios", 143: "imap", 389: "ldap",
-    443: "https", 445: "smb", 465: "smtps", 514: "syslog", 548: "afp", 587: "smtp", 631: "nyomtatás",
+    69: "tftp", 80: "web", 110: "pop3", 123: "ntp", 137: "netbios", 138: "netbios", 139: "netbios", 143: "imap", 389: "ldap",
+    443: "https", 445: "samba", 465: "smtps", 514: "syslog", 548: "afp", 587: "smtp", 631: "nyomtatás",
     636: "ldaps", 873: "rsync", 993: "imaps", 995: "pop3s", 1194: "openvpn", 1883: "mqtt",
     1900: "upnp", 2049: "nfs", 3306: "mysql", 3389: "rdp", 5060: "sip", 5353: "mdns",
     5432: "postgres", 5900: "vnc", 6379: "redis", 8006: "proxmox", 8008: "matrix",
@@ -299,7 +299,7 @@ def parse_ports(s):
     return out
 
 
-def desktop_template(v6, ssh, tcp, udp):
+def desktop_template(v6, ssh, tcp, udp, samba=False, dom=False, net=""):
     def c(text):
         return f'-m comment --comment "{text}"'
     r = [":INPUT DROP [0:0]", ":FORWARD DROP [0:0]", ":OUTPUT ACCEPT [0:0]",
@@ -316,6 +316,14 @@ def desktop_template(v6, ssh, tcp, udp):
     if ssh:
         r.append(f"-A INPUT -p tcp --dport 22 -m conntrack --ctstate NEW "
                  f"{c(service_comment('tcp', '22'))} -j ACCEPT")
+    if samba and (not v6 or not net):      # korlátozott hálózat esetén csak IPv4-en (IPv6-on nem nyitunk)
+        src = f"-s {net} " if (net and not v6) else ""
+        r += [f"-A INPUT {src}-p tcp --dport {p} {c(service_comment('tcp', p))} -j ACCEPT"
+              for p in ("445", "139")]
+        r += [f"-A INPUT {src}-p udp --dport {p} {c(service_comment('udp', p))} -j ACCEPT"
+              for p in ("137", "138")]
+    if dom and not v6:
+        r.append(f"-A INPUT -p udp --sport 137 --dport 137 {c('netbios-válasz')} -j ACCEPT")
     r += [f"-A INPUT -p tcp --dport {p} {c(service_comment('tcp', p))} -j ACCEPT" for p in tcp]
     r += [f"-A INPUT -p udp --dport {p} {c(service_comment('udp', p))} -j ACCEPT" for p in udp]
     return "*filter\n" + "\n".join(r) + "\nCOMMIT\n"
@@ -679,11 +687,20 @@ def gui_main():
                 ("Veyon szolgáltatás engedése (11100)", False),
                 ("Veyon bemutató mód engedése (11400, tanári gép)", False),
                 ("Webszerver engedése (80, 443)", False),
+                ("Samba fájlmegosztás engedése (445, 139, 137-138/udp)", False),
+                ("Samba tartományi kliens (NetBIOS-válaszok, 137/udp)", False),
+                ("Samba csak ebből a hálózatból (pl. 10.0.0.0/24; üres = mindenhonnan)", ""),
                 ("További bejövő TCP portok (vesszővel)", ""),
                 ("További bejövő UDP portok (vesszővel)", "")])
             if not v:
                 return
-            extra_tcp, udp = parse_ports(v[4]), parse_ports(v[5])
+            net = ""
+            if v[6]:
+                if not self.ok_net(v[6]):
+                    self.say(1, "Hibás hálózat (pl. 10.0.0.0/24).")
+                    return
+                net = str(ipaddress.IPv4Network(v[6], strict=False))
+            extra_tcp, udp = parse_ports(v[7]), parse_ports(v[8])
             if extra_tcp is None or udp is None:
                 self.say(1, "Hibás portlista (pl.: 80,443,8000:8010).")
                 return
@@ -700,7 +717,8 @@ def gui_main():
                     "ICMPv6. Folytatod?"):
                 return
             for ver in ("v4", "v6"):
-                text = desktop_template(ver == "v6", v[0] == "1", tcp, udp)
+                text = desktop_template(ver == "v6", v[0] == "1", tcp, udp,
+                                        samba=v[4] == "1", dom=v[5] == "1", net=net)
                 rc, _, err = self.h.restore(ver, text)
                 if rc != 0:
                     self.refresh()
