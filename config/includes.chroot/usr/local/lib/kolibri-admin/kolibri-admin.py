@@ -7,7 +7,7 @@ A jogosultságot pkexec adja: egyetlen hitelesítés után egy szűk műveletké
 dolgozik (nem tetszőleges parancsokat futtat). Eltávolítás: kolibri-admin --uninstall
 """
 import sys, os, json, re, shlex, subprocess, shutil, hashlib, time, threading, urllib.request, datetime
-import base64, ipaddress
+import base64, ipaddress, pwd, grp
 
 LIBDIR = "/usr/local/lib/kolibri-admin"
 INSTALL_PATH = LIBDIR + "/kolibri-admin.py"      # root tulajdonú példány, ezt futtatja a pkexec
@@ -15,6 +15,13 @@ BIN_PATH = "/usr/local/bin/kolibri-admin"
 DESKTOP_PATH = "/usr/share/applications/kolibri-admin.desktop"
 ICON_PATH = "/usr/share/icons/hicolor/scalable/apps/kolibri-admin.svg"
 LOG = "/var/log/kolibri-admin-install.log"
+APP_NAME = os.path.basename(LIBDIR)                  # az alkalmazás neve (a LIBDIR utolsó eleme)
+APP_TITLE = APP_NAME.replace("-", " ").title()
+VPN_GROUP = "vpn"                                    # tagjai jelszó nélkül kapcsolhatják a VPN-t
+VPN_HELPER = LIBDIR + "/vpn-helper"                  # szűk root segéd: csak wg_list / wg_up / wg_down
+POLKIT_ID = "hu." + APP_NAME.replace("-", ".") + ".vpn"
+POLKIT_POLICY = f"/usr/share/polkit-1/actions/{POLKIT_ID}.policy"
+POLKIT_RULE = f"/etc/polkit-1/rules.d/49-{APP_NAME}-vpn.rules"
 REQUIRED = ["python3", "python3-gi", "gir1.2-gtk-3.0", "pkexec"]
 POLKIT_AGENTS = ["policykit-1-gnome", "polkit-1-gnome", "xfce-polkit", "lxpolkit"]
 
@@ -67,7 +74,8 @@ def deps_ok():
 
 
 def self_installed():
-    return all(os.path.exists(p) for p in (INSTALL_PATH, BIN_PATH, DESKTOP_PATH, ICON_PATH))
+    return all(os.path.exists(p) for p in (INSTALL_PATH, BIN_PATH, DESKTOP_PATH, ICON_PATH,
+                                           VPN_HELPER, POLKIT_POLICY))
 
 
 def same_file(a, b):
@@ -143,6 +151,95 @@ def refresh_caches():
         sh(["gtk-update-icon-cache", "-f", "-t", "/usr/share/icons/hicolor"])
 
 
+# ------------------------------------- jelszó nélküli VPN (vpn csoport + polkit)
+def vpn_helper_script():
+    """A pkexec-kel indított szűk segéd: a fő program moduljából csak a vpn_helper_main()-t hívja."""
+    return ("#!/usr/bin/python3 -I\n"
+            f"# {APP_TITLE}: szűk jogosultságú VPN-segéd. A polkit-szabály a(z) '{VPN_GROUP}' csoport tagjainak\n"
+            "# jelszó nélkül engedi; csak a wg_list / wg_up / wg_down műveletet hajtja végre.\n"
+            "import importlib.util\n"
+            f"spec = importlib.util.spec_from_file_location(\"admin_core\", {INSTALL_PATH!r})\n"
+            "core = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(core)\n"
+            "core.vpn_helper_main()\n")
+
+
+def vpn_policy_xml():
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>{APP_TITLE}</vendor>
+  <action id="{POLKIT_ID}">
+    <description>VPN (WireGuard) ki/be kapcsolása</description>
+    <message>A VPN kapcsolásához hitelesítés szükséges</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">{VPN_HELPER}</annotate>
+  </action>
+</policyconfig>
+"""
+
+
+def vpn_rule_js():
+    return (f"// {APP_TITLE}: a '{VPN_GROUP}' csoport tagjai jelszó nélkül kapcsolhatják a VPN-t\n"
+            "polkit.addRule(function(action, subject) {\n"
+            f'    if (action.id == "{POLKIT_ID}" && subject.isInGroup("{VPN_GROUP}")) {{\n'
+            "        return polkit.Result.YES;\n"
+            "    }\n"
+            "});\n")
+
+
+def invoking_user():
+    """Az a felhasználó, aki a telepítést (sudo-val vagy pkexec-kel) elindította."""
+    u = os.environ.get("SUDO_USER")
+    if not u and os.environ.get("PKEXEC_UID", "").isdigit():
+        try:
+            u = pwd.getpwuid(int(os.environ["PKEXEC_UID"])).pw_name
+        except KeyError:
+            u = None
+    return u if u and u != "root" else None
+
+
+def vpn_group_setup(user=None):
+    if subprocess.run(["getent", "group", VPN_GROUP], capture_output=True).returncode != 0:
+        if sh(["groupadd", "-r", VPN_GROUP]) != 0:
+            ilog(f"HIBA: a(z) {VPN_GROUP} csoport létrehozása nem sikerült (részletek: {LOG}).")
+            return False
+        ilog(f"A(z) {VPN_GROUP} csoport létrehozva.")
+    if user:
+        try:
+            pwd.getpwnam(user)
+        except KeyError:
+            ilog(f"HIBA: nincs ilyen felhasználó: {user}")
+            return False
+        if sh(["usermod", "-aG", VPN_GROUP, user]) != 0:
+            ilog(f"HIBA: {user} hozzáadása a(z) {VPN_GROUP} csoporthoz nem sikerült (részletek: {LOG}).")
+            return False
+        ilog(f"{user} hozzáadva a(z) {VPN_GROUP} csoporthoz: a VPN jelszó nélkül kapcsolható.")
+    else:
+        ilog(f"Figyelem: nem derült ki, melyik felhasználót vegyem fel a(z) {VPN_GROUP} csoportba. "
+             f"Pótlás: {APP_NAME} --vpn-user FELHASZNÁLÓ")
+    return True
+
+
+def vpn_install(user):
+    put(VPN_HELPER, vpn_helper_script(), 0o755)
+    put(POLKIT_POLICY, vpn_policy_xml(), 0o644)
+    put(POLKIT_RULE, vpn_rule_js(), 0o644)
+    vpn_group_setup(user)
+
+
+def vpn_user_main(user):
+    if not vpn_group_setup(user):
+        return 1
+    print(f"Kész: {user} a(z) {VPN_GROUP} csoport tagja.")
+    return 0
+
+
 def install_main(src):
     if os.geteuid() != 0:
         print("A telepítéshez root jog kell.")
@@ -172,13 +269,14 @@ def install_main(src):
     put(BIN_PATH, f'#!/bin/sh\nexec /usr/bin/python3 {INSTALL_PATH} "$@"\n', 0o755)
     put(DESKTOP_PATH, DESKTOP_FILE, 0o644)
     put(ICON_PATH, ICON_SVG, 0o644)
+    vpn_install(invoking_user())
     refresh_caches()
     ilog("Kész: Alkalmazásmenü › Rendszer › Kolibri Admin (parancs: kolibri-admin)")
     return 0
 
 
 def uninstall_main():
-    for p in (BIN_PATH, DESKTOP_PATH, ICON_PATH):
+    for p in (BIN_PATH, DESKTOP_PATH, ICON_PATH, POLKIT_POLICY, POLKIT_RULE):
         try:
             os.remove(p)
         except OSError:
@@ -808,14 +906,31 @@ def helper_main():
             emit({"rc": 1, "msg": str(e)})
 
 
+VPN_OPS = ("wg_list", "wg_up", "wg_down")
+
+
+def vpn_helper_main():
+    """A szűk segéd: ugyanaz a JSON-protokoll, de csak a VPN ki/be kapcsolása és a lista."""
+    for line in sys.stdin:
+        try:
+            req = json.loads(line)
+            if req.get("op") not in VPN_OPS:
+                raise RuntimeError("Ez a művelet jelszó nélkül nem engedélyezett.")
+            msg, data = OPS[req["op"]](req)
+            emit({"rc": 0, "msg": msg, "data": data})
+        except Exception as e:  # noqa: BLE001
+            emit({"rc": 1, "msg": str(e)})
+
+
 class Helper:
-    def __init__(self):
+    def __init__(self, cmd=None):
+        self.cmd = cmd or ["pkexec", "/usr/bin/python3", INSTALL_PATH, "--helper"]
         self.p = None
         self.data = None
 
     def _start(self):
         if self.p is None or self.p.poll() is not None:
-            self.p = subprocess.Popen(["pkexec", "/usr/bin/python3", INSTALL_PATH, "--helper"],
+            self.p = subprocess.Popen(self.cmd,
                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE, encoding="utf-8")
 
     def call(self, req, on_log=None):
@@ -854,6 +969,18 @@ CLOCK_FORMATS = ["%H:%M", "%Y.%m.%d. %H:%M", "%A, %Y. %B %d., %H:%M", "%a %H:%M"
 INDICATORS = [("~host", "Gépnév"), ("~clock", "Dátum és idő"), ("~session", "Munkamenet-választó"),
               ("~language", "Nyelvválasztó"), ("~a11y", "Akadálymentesítés"),
               ("~power", "Kikapcsolás / újraindítás menü")]
+
+
+def vpn_direct():
+    """Tagja-e a program felhasználója a vpn csoportnak (a polkit-szabály a /etc/group alapján dönt,
+    így újrabejelentkezés nélkül is él), és telepítve van-e a szűk segéd."""
+    try:
+        g = grp.getgrnam(VPN_GROUP)
+        u = pwd.getpwuid(os.getuid())
+    except KeyError:
+        return False
+    return ((u.pw_name in g.gr_mem or u.pw_gid == g.gr_gid)
+            and os.path.exists(VPN_HELPER) and os.path.exists(POLKIT_POLICY))
 
 
 def svc_active(name):
@@ -901,6 +1028,7 @@ def gui_main(helper=None, run=True):
             self.set_default_size(980, 720)
             self.connect("destroy", Gtk.main_quit)
             self.h = helper or Helper()
+            self.hv = Helper(["pkexec", VPN_HELPER]) if (helper is None and vpn_direct()) else None
             self.busy = False
             self.pkgrows = []
             self.bg_path = None
@@ -1021,8 +1149,9 @@ def gui_main(helper=None, run=True):
             def worker():
                 rc, msg, data = 0, "", None
                 for op, params in steps:
-                    rc, msg = self.h.call(dict(params, op=op), on_log=lambda m: GLib.idle_add(self.log, m))
-                    data = self.h.data
+                    h = self.hv if (self.hv and op in VPN_OPS) else self.h
+                    rc, msg = h.call(dict(params, op=op), on_log=lambda m: GLib.idle_add(self.log, m))
+                    data = h.data
                     if rc != 0:
                         break
                 GLib.idle_add(self.task_done, rc, msg, cb, data)
@@ -1130,7 +1259,15 @@ def gui_main(helper=None, run=True):
                 ok = pkg_ok("wireguard-tools")
                 for w in self.wg_ctrls:
                     w.set_sensitive(ok)
-                self.wg_hint.set_text("" if ok else "⚠ A WireGuard eszközök nincsenek telepítve: előbb telepítsd őket fent.")
+                if not ok:
+                    hint = "⚠ A WireGuard eszközök nincsenek telepítve: előbb telepítsd őket fent."
+                elif self.hv:
+                    hint = (f"✔ A(z) {VPN_GROUP} csoport tagja vagy: a VPN jelszó nélkül kapcsolható. "
+                            "Profil létrehozásához, szerkesztéséhez és törléséhez rendszergazdai jelszó kell.")
+                else:
+                    hint = (f"A VPN kapcsolásához jelszó kell. Jelszó nélkülihez vedd fel a felhasználót a "
+                            f"{VPN_GROUP} csoportba: {APP_NAME} --vpn-user FELHASZNÁLÓ")
+                self.wg_hint.set_text(hint)
                 if ok and not self.wg_loaded and self.stack.get_visible_child_name() == self.page_names[self.wg_idx]:
                     self.wg_refresh()
 
@@ -1383,7 +1520,8 @@ def gui_main(helper=None, run=True):
         def page_wg(self):
             b = self.mk_page("WireGuard VPN",
                              "Meglévő kliens-kulcsok (profilok) importálása és kezelése; a VPN profilonként "
-                             "kapcsolható ki/be. A lista megnyitásakor hitelesítést kér a rendszer.")
+                             "kapcsolható ki/be. Ha nem vagy a vpn csoport tagja, a lista megnyitásakor és a "
+                             "kapcsoláskor hitelesítést kér a rendszer.")
             self.pkg_row(b, "WireGuard eszközök", "A wireguard-tools csomag (wg, wg-quick) a Debian-tárolóból.",
                          "wireguard-tools", [("pkg", {"action": "install", "pkgs": ["wireguard-tools"]})],
                          [("pkg", {"action": "remove", "pkgs": ["wireguard-tools"]})])
@@ -1683,6 +1821,10 @@ def main():
         sys.exit(install_main(a[1] if len(a) > 1 else INSTALL_PATH))
     if "--uninstall" in a:
         sys.exit(uninstall_main() if os.geteuid() == 0 else run_elevated(["--uninstall"]))
+    if a[:1] == ["--vpn-user"]:
+        if len(a) != 2:
+            sys.exit(f"Használat: {APP_NAME} --vpn-user FELHASZNÁLÓ")
+        sys.exit(vpn_user_main(a[1]) if os.geteuid() == 0 else run_elevated(["--vpn-user", a[1]]))
     me = os.path.realpath(__file__)
     if os.geteuid() == 0:
         rc = install_main(me)
