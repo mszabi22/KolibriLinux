@@ -74,8 +74,7 @@ def deps_ok():
 
 
 def self_installed():
-    return all(os.path.exists(p) for p in (INSTALL_PATH, BIN_PATH, DESKTOP_PATH, ICON_PATH,
-                                           VPN_HELPER, POLKIT_POLICY))
+    return all(os.path.exists(p) for p in (INSTALL_PATH, BIN_PATH, DESKTOP_PATH, ICON_PATH))
 
 
 def same_file(a, b):
@@ -204,36 +203,52 @@ def invoking_user():
     return u if u and u != "root" else None
 
 
-def vpn_group_setup(user=None):
+def vpn_group_setup(user=None, log=None):
+    """A vpn csoport létrehozása (ha kell) és a felhasználó felvétele. A root segédből hlog-gal hívjuk,
+    mert az ilog stdoutra írna, ami ott a JSON-protokoll csatornája. True: a felhasználó tag lett."""
+    log = log or ilog
     if subprocess.run(["getent", "group", VPN_GROUP], capture_output=True).returncode != 0:
         if sh(["groupadd", "-r", VPN_GROUP]) != 0:
-            ilog(f"HIBA: a(z) {VPN_GROUP} csoport létrehozása nem sikerült (részletek: {LOG}).")
+            log(f"HIBA: a(z) {VPN_GROUP} csoport létrehozása nem sikerült (részletek: {LOG}).")
             return False
-        ilog(f"A(z) {VPN_GROUP} csoport létrehozva.")
-    if user:
-        try:
-            pwd.getpwnam(user)
-        except KeyError:
-            ilog(f"HIBA: nincs ilyen felhasználó: {user}")
-            return False
-        if sh(["usermod", "-aG", VPN_GROUP, user]) != 0:
-            ilog(f"HIBA: {user} hozzáadása a(z) {VPN_GROUP} csoporthoz nem sikerült (részletek: {LOG}).")
-            return False
-        ilog(f"{user} hozzáadva a(z) {VPN_GROUP} csoporthoz: a VPN jelszó nélkül kapcsolható.")
-    else:
-        ilog(f"Figyelem: nem derült ki, melyik felhasználót vegyem fel a(z) {VPN_GROUP} csoportba. "
-             f"Pótlás: {APP_NAME} --vpn-user FELHASZNÁLÓ")
+        log(f"A(z) {VPN_GROUP} csoport létrehozva.")
+    if not user:
+        log(f"Figyelem: nem derült ki, melyik felhasználót vegyem fel a(z) {VPN_GROUP} csoportba. "
+            f"Pótlás: {APP_NAME} --vpn-user FELHASZNÁLÓ")
+        return False
+    try:
+        pwd.getpwnam(user)
+    except KeyError:
+        log(f"HIBA: nincs ilyen felhasználó: {user}")
+        return False
+    if sh(["usermod", "-aG", VPN_GROUP, user]) != 0:
+        log(f"HIBA: {user} hozzáadása a(z) {VPN_GROUP} csoporthoz nem sikerült (részletek: {LOG}).")
+        return False
+    log(f"{user} hozzáadva a(z) {VPN_GROUP} csoporthoz: a VPN jelszó nélkül kapcsolható.")
     return True
 
 
-def vpn_install(user):
+def vpn_files_install():
     put(VPN_HELPER, vpn_helper_script(), 0o755)
     put(POLKIT_POLICY, vpn_policy_xml(), 0o644)
     put(POLKIT_RULE, vpn_rule_js(), 0o644)
-    vpn_group_setup(user)
+
+
+def vpn_first_setup():
+    """Új profil létrehozásakor/importálásakor (root segéd): szűk segéd + polkit-szabály, vpn csoport,
+    és az adott felhasználó felvétele. Hiba esetén a profil mentése attól még sikeres."""
+    try:
+        vpn_files_install()
+        user = invoking_user()
+        if vpn_group_setup(user, hlog):
+            return f" A(z) {user} a(z) {VPN_GROUP} csoport tagja lett: a VPN innentől jelszó nélkül kapcsolható."
+    except Exception as e:  # noqa: BLE001
+        hlog(f"Figyelem: a jelszó nélküli VPN beállítása nem sikerült: {e}")
+    return ""
 
 
 def vpn_user_main(user):
+    vpn_files_install()
     if not vpn_group_setup(user):
         return 1
     print(f"Kész: {user} a(z) {VPN_GROUP} csoport tagja.")
@@ -269,7 +284,6 @@ def install_main(src):
     put(BIN_PATH, f'#!/bin/sh\nexec /usr/bin/python3 {INSTALL_PATH} "$@"\n', 0o755)
     put(DESKTOP_PATH, DESKTOP_FILE, 0o644)
     put(ICON_PATH, ICON_SVG, 0o644)
-    vpn_install(invoking_user())
     refresh_caches()
     ilog("Kész: Alkalmazásmenü › Rendszer › Kolibri Admin (parancs: kolibri-admin)")
     return 0
@@ -841,7 +855,8 @@ def op_wg_save(r):
     os.chmod(WG_DIR, 0o700)
     put_secret(path, wg_render_conf(o))
     hlog(f"Profil mentve: {path}")
-    return f"Profil mentve: {name}", wg_collect()
+    note = "" if r.get("edit") else vpn_first_setup()
+    return f"Profil mentve: {name}." + note, wg_collect()
 
 
 def op_wg_up(r):
@@ -1028,6 +1043,7 @@ def gui_main(helper=None, run=True):
             self.set_default_size(980, 720)
             self.connect("destroy", Gtk.main_quit)
             self.h = helper or Helper()
+            self.helper_injected = helper is not None
             self.hv = Helper(["pkexec", VPN_HELPER]) if (helper is None and vpn_direct()) else None
             self.busy = False
             self.pkgrows = []
@@ -1265,8 +1281,9 @@ def gui_main(helper=None, run=True):
                     hint = (f"✔ A(z) {VPN_GROUP} csoport tagja vagy: a VPN jelszó nélkül kapcsolható. "
                             "Profil létrehozásához, szerkesztéséhez és törléséhez rendszergazdai jelszó kell.")
                 else:
-                    hint = (f"A VPN kapcsolásához jelszó kell. Jelszó nélkülihez vedd fel a felhasználót a "
-                            f"{VPN_GROUP} csoportba: {APP_NAME} --vpn-user FELHASZNÁLÓ")
+                    hint = (f"A VPN kapcsolásához jelszó kell. Az első profil létrehozásakor a program felveszi "
+                            f"a felhasználót a(z) {VPN_GROUP} csoportba, utána jelszó nélkül kapcsolható. "
+                            f"Más felhasználó: {APP_NAME} --vpn-user FELHASZNÁLÓ")
                 self.wg_hint.set_text(hint)
                 if ok and not self.wg_loaded and self.stack.get_visible_child_name() == self.page_names[self.wg_idx]:
                     self.wg_refresh()
@@ -1784,6 +1801,8 @@ def gui_main(helper=None, run=True):
         def wg_saved(self, rc, msg, data):
             self.wg_done(rc, msg, data)
             if rc == 0:
+                if self.hv is None and not self.helper_injected and vpn_direct():
+                    self.hv = Helper(["pkexec", VPN_HELPER])     # az első profil után már jelszó nélkül megy
                 self.wg_cancel()
 
         def wg_cancel(self, *_):
