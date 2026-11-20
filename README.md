@@ -123,6 +123,8 @@ Hibát találtál, vagy van ötleted? Írj a projekt weboldalán található [ka
 
 A Kolibri Linux a Debian GNU/Linux rendszerre épül, a benne található programok mindegyike a saját licence szerint használható. A Brave, a Signal és a további említett programok nevei a tulajdonosaik védjegyei, a projektnek nincs hivatalos kapcsolata velük.
 
+A projekt AI felhasználásával készült, annak képességeinek megismerése céljából.
+
 ## Szerző
 
 © 2026 Major Szabolcs · <https://sleepy.hu/>
