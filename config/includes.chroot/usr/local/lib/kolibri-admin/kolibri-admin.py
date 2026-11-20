@@ -671,7 +671,7 @@ def ad_clean(v, need_login=True, need_host=True):
         raise RuntimeError("Érvénytelen gépnév: legfeljebb 15 karakter, csak kisbetű, szám és kötőjel "
                            "lehet, kötőjellel nem kezdődhet és nem végződhet.")
     if not AD_DOM_RE.fullmatch(dom):
-        raise RuntimeError("Érvénytelen tartománynév (pl. samba.crnl.lan).")
+        raise RuntimeError("Érvénytelen tartománynév (pl. samba.lan).")
     if need_login:
         if not AD_USER_RE.fullmatch(user):
             raise RuntimeError("Add meg a tartományi felhasználónevet (domain nélkül, pl. mszabi).")
@@ -770,7 +770,7 @@ def op_ad_join(r):
         raise RuntimeError(f"Nem találom a domain szekciót a(z) {SSSD_CONF} fájlban.")
     ini_set(SSSD_CONF, sec, {
         "use_fully_qualified_names": "False",
-        "fallback_homedir": "/home/%u",
+        "fallback_homedir": "/home/%d/%u",
         "default_shell": "/bin/bash",
         "ad_gpo_access_control": "permissive",
         "krb5_ccname_template": "FILE:%d/krb5cc_%U_XXXXXX",
@@ -1740,8 +1740,8 @@ def gui_main(helper=None, run=True):
             self.head(b, "A tartomány és a gép adatai")
             grid = Gtk.Grid(column_spacing=14, row_spacing=10)
             self.ad_e = {}
-            spec = [("host", "Gépnév", "pl. pc-cl-01", False),
-                    ("domain", "Tartomány neve", "pl. samba.crnl.lan", False),
+            spec = [("host", "Gépnév", "pl. pc-kl-01", False),
+                    ("domain", "Tartomány neve", "pl. samba.lan", False),
                     ("user", "Tartományi felhasználó", "domain nélkül, pl. mszabi", False),
                     ("password", "Jelszó", "", True)]
             for i, (k, label, ph, secret) in enumerate(spec):
@@ -1758,7 +1758,7 @@ def gui_main(helper=None, run=True):
                 grid.attach(e, 1, i, 1, 1)
                 self.ad_e[k] = e
             self.ad_e["host"].set_text(os.uname().nodename.split(".")[0])
-            self.ad_e["domain"].set_text("samba.crnl.lan")
+            self.ad_e["domain"].set_text("samba.lan")
             b.pack_start(grid, False, False, 4)
             b.pack_start(self.lab("A gépnév legfeljebb 15 karakter lehet (kisbetű, szám, kötőjel). "
                                   "A felhasználónak jogosultnak kell lennie a gép tartományba vételére."),
