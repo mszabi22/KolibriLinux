@@ -1771,6 +1771,207 @@ def hu_key(s):
     return (out, s.lower())
 
 
+# ------------------------------------------------------------ felhasználók kezelése
+US_NAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")                 # új felhasználó neve
+US_ANY_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,63}$")      # meglévő név / csoportnév
+US_UID_MIN, US_UID_MAX = 1000, 60000
+US_ADMIN_GROUP = "sudo"
+
+
+def us_shells():
+    seen, out = set(), []
+    try:
+        with open("/etc/shells", encoding="utf-8") as f:
+            for line in f:
+                s = line.strip()
+                if s.startswith("/") and os.path.exists(s) and not s.endswith(("nologin", "/false")):
+                    rp = os.path.realpath(s)
+                    if rp not in seen:
+                        seen.add(rp)
+                        out.append(s)
+    except OSError:
+        pass
+    return out or ["/bin/bash"]
+
+
+def us_shadow_field(name):
+    try:
+        with open("/etc/shadow", encoding="utf-8") as f:
+            for line in f:
+                p = line.rstrip("\n").split(":")
+                if p[0] == name and len(p) > 1:
+                    return p[1]
+    except OSError:
+        pass
+    return None
+
+
+def us_collect():
+    groups = grp.getgrall()
+    by_user = {}
+    for g in groups:
+        for m in g.gr_mem:
+            by_user.setdefault(m, []).append(g.gr_name)
+    gname = {g.gr_gid: g.gr_name for g in groups}
+    users = []
+    for u in pwd.getpwall():
+        sh = us_shadow_field(u.pw_name)
+        users.append({"name": u.pw_name, "uid": u.pw_uid, "gid": u.pw_gid, "group": gname.get(u.pw_gid, str(u.pw_gid)),
+                      "full": u.pw_gecos.split(",")[0], "home": u.pw_dir, "shell": u.pw_shell,
+                      "locked": bool(sh and sh.startswith("!")), "groups": sorted(by_user.get(u.pw_name, []))})
+    return {"users": users,
+            "groups": [{"name": g.gr_name, "gid": g.gr_gid, "members": list(g.gr_mem)} for g in groups],
+            "shells": us_shells(), "admin_group": US_ADMIN_GROUP}
+
+
+def us_target(r):
+    name = r.get("name")
+    if not isinstance(name, str) or not US_ANY_NAME_RE.match(name):
+        raise RuntimeError("Érvénytelen felhasználónév.")
+    try:
+        u = pwd.getpwnam(name)
+    except KeyError:
+        raise RuntimeError("Nincs ilyen felhasználó.")
+    if not US_UID_MIN <= u.pw_uid < US_UID_MAX:
+        raise RuntimeError("A rendszerfiókok és a root itt nem módosíthatók.")
+    return u
+
+
+def us_password(pw):
+    if not isinstance(pw, str) or not 6 <= len(pw) <= 128 or re.search(r"[\x00-\x1f\x7f]", pw):
+        raise RuntimeError("A jelszó 6–128 karakter lehet, vezérlőkarakter nélkül.")
+    return pw
+
+
+def us_fullname(s):
+    s = (s or "").strip() if isinstance(s, str) else ""
+    if len(s) > 100 or re.search(r"[:,\x00-\x1f\x7f]", s):
+        raise RuntimeError("A teljes név legfeljebb 100 karakter lehet, és nem tartalmazhat kettőspontot vagy vesszőt.")
+    return s
+
+
+def us_shell(sh):
+    try:
+        with open("/etc/shells", encoding="utf-8") as f:
+            ok = {line.strip() for line in f if line.strip().startswith("/")}
+    except OSError:
+        ok = set()
+    if not isinstance(sh, str) or sh not in ok:
+        raise RuntimeError("Érvénytelen parancsértelmező (shell).")
+    return sh
+
+
+def us_groups(names):
+    out = []
+    for n in names or []:
+        if not isinstance(n, str) or not US_ANY_NAME_RE.match(n):
+            raise RuntimeError("Érvénytelen csoportnév.")
+        try:
+            grp.getgrnam(n)
+        except KeyError:
+            raise RuntimeError(f"Nincs ilyen csoport: {n}")
+        out.append(n)
+    return out
+
+
+def us_admins_after(removed):
+    try:
+        mem = set(grp.getgrnam(US_ADMIN_GROUP).gr_mem)
+    except KeyError:
+        return None
+    return mem - {removed}
+
+
+def op_user_list(r):
+    return "A felhasználók betöltve.", us_collect()
+
+
+def op_user_add(r):
+    name = r.get("name", "")
+    if not isinstance(name, str) or not US_NAME_RE.match(name):
+        raise RuntimeError("Érvénytelen felhasználónév: kisbetűvel vagy _ jellel kezdődjön, csak kisbetű, szám, _ és - lehet, "
+                           "legfeljebb 32 karakter.")
+    try:
+        pwd.getpwnam(name)
+        raise RuntimeError("Már van ilyen nevű felhasználó.")
+    except KeyError:
+        pass
+    try:
+        grp.getgrnam(name)
+        raise RuntimeError("Már létezik ilyen nevű csoport.")
+    except KeyError:
+        pass
+    full = us_fullname(r.get("fullname"))
+    shell = us_shell(r.get("shell") or "/bin/bash")
+    pw = us_password(r.get("password"))
+    groups = us_groups(r.get("add_groups"))
+    hrun(["useradd", "-m" if r.get("create_home", True) else "-M", "-s", shell, "-c", full, name])
+    try:
+        hrun(["chpasswd"], stdin_text=f"{name}:{pw}")
+        if groups:
+            hrun(["usermod", "-a", "-G", ",".join(groups), name])
+        if r.get("force_change"):
+            hrun(["chage", "-d", "0", name])
+    except Exception:
+        hrun(["userdel", "-r", name], check=False)       # félig kész fiók nem maradhat
+        raise
+    return f"A(z) {name} felhasználó létrehozva.", us_collect()
+
+
+def op_user_edit(r):
+    u = us_target(r)
+    name = u.pw_name
+    me = invoking_user()
+    full = us_fullname(r.get("fullname"))
+    if full != u.pw_gecos.split(",")[0]:
+        hrun(["usermod", "-c", full, name])
+    shell = r.get("shell")
+    if shell and shell != u.pw_shell:
+        hrun(["usermod", "-s", us_shell(shell), name])
+    add, rm = us_groups(r.get("add_groups")), us_groups(r.get("rm_groups"))
+    if US_ADMIN_GROUP in rm:
+        if name == me:
+            raise RuntimeError("Saját magadat nem veheted ki a(z) sudo csoportból.")
+        left = us_admins_after(name)
+        if left is not None and not left:
+            raise RuntimeError("Az utolsó rendszergazdát nem lehet kivenni a(z) sudo csoportból.")
+    pw = r.get("password")
+    if pw:
+        hrun(["chpasswd"], stdin_text=f"{name}:{us_password(pw)}")
+    want_locked = bool(r.get("locked"))
+    field = us_shadow_field(name) or ""
+    now_locked = field.startswith("!")
+    if want_locked and not now_locked:
+        if name == me:
+            raise RuntimeError("Saját fiókodat nem zárolhatod.")
+        hrun(["usermod", "-L", name])
+    elif not want_locked and now_locked:
+        if field.lstrip("!*") == "":
+            raise RuntimeError("A zárolás feloldásához új jelszót kell megadni (a fióknak most nincs jelszava).")
+        hrun(["usermod", "-U", name])
+    if r.get("force_change"):
+        hrun(["chage", "-d", "0", name])
+    if add:
+        hrun(["usermod", "-a", "-G", ",".join(add), name])
+    for g in rm:
+        hrun(["gpasswd", "-d", name, g], check=False)
+    return f"A(z) {name} felhasználó adatai mentve.", us_collect()
+
+
+def op_user_delete(r):
+    u = us_target(r)
+    name = u.pw_name
+    if name == invoking_user():
+        raise RuntimeError("Saját magadat nem törölheted.")
+    left = us_admins_after(name)
+    if left is not None and not left and name in grp.getgrnam(US_ADMIN_GROUP).gr_mem:
+        raise RuntimeError("Az utolsó rendszergazdát nem lehet törölni.")
+    if subprocess.run(["pgrep", "-u", str(u.pw_uid)], capture_output=True).returncode == 0:
+        raise RuntimeError("A felhasználó be van jelentkezve, vagy futnak a folyamatai: előbb jelentkeztesd ki.")
+    hrun(["userdel"] + (["-r"] if r.get("remove_home") else []) + [name])
+    return f"A(z) {name} felhasználó eltávolítva.", us_collect()
+
+
 OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremove,
        "chrony": op_chrony, "chrony_ctl": op_chrony_ctl, "time": op_time,
        "wg_list": op_wg_list, "wg_save": op_wg_save, "wg_up": op_wg_up, "wg_down": op_wg_down,
@@ -1780,7 +1981,9 @@ OPS = {"login": op_login, "pkg": op_pkg, "deb": op_deb, "debremove": op_debremov
        "share_pwdel": op_share_pwdel, "share_restart": op_share_restart,
        "ad_join": op_ad_join, "ad_leave": op_ad_leave,
        "pm_refresh": op_pm_refresh, "pm_upgrade": op_pm_upgrade, "pm_install": op_pm_install,
-       "pm_remove": op_pm_remove, "pm_cleanup": op_pm_cleanup, "pm_flatpak_setup": op_pm_flatpak_setup}
+       "pm_remove": op_pm_remove, "pm_cleanup": op_pm_cleanup, "pm_flatpak_setup": op_pm_flatpak_setup,
+       "user_list": op_user_list, "user_add": op_user_add, "user_edit": op_user_edit,
+       "user_delete": op_user_delete}
 
 
 def helper_main():
@@ -1981,8 +2184,18 @@ XP_SVG["pkg"] = ('<path d="M6 16 L24 8 L42 16 L24 24 Z" fill="#ecd093" stroke="#
                  '<path d="M35 30 V40 M31 36 L35 41 L39 36" stroke="#fff" stroke-width="2.8" fill="none" '
                  'stroke-linecap="round" stroke-linejoin="round"/>')
 XP_FALLBACK_ICON["pkg"] = "system-software-install"
+XP_SVG["users"] = ('<circle cx="32" cy="14" r="6" fill="#f5d6a8" stroke="#8a5f1d"/>'
+                   '<path d="M21 36 C21 26 43 26 43 36 Z" fill="#8fbdf2" stroke="#0b2a7a"/>'
+                   '<circle cx="17" cy="18" r="7" fill="#f5c27a" stroke="#8a5f1d"/>'
+                   '<path d="M4 42 C4 29 30 29 30 42 Z" fill="url(#a)" stroke="#0b2a7a"/>')
+XP_SVG["question"] = ('<circle cx="24" cy="24" r="20" fill="url(#a)" stroke="#0b2a7a" stroke-width="1.5"/>'
+                      '<path d="M17 19 C17 10 31 10 31 19 C31 25 24 25 24 31" stroke="#fff" stroke-width="5" fill="none" '
+                      'stroke-linecap="round"/><circle cx="24" cy="38" r="3" fill="#fff"/>')
+XP_FALLBACK_ICON["users"] = "system-users"
+XP_FALLBACK_ICON["question"] = "dialog-question"
 XP_CSS = """
-window.xp { background-color: #ECE9D8; }
+window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
+.xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
 .xp * { font-family: Tahoma, "DejaVu Sans", "Noto Sans", sans-serif; font-size: 9pt; }
 .xp .monospace, .xp textview.monospace { font-family: monospace; }
 .xp label, .xp checkbutton, .xp radiobutton { color: #000000; }
@@ -2082,6 +2295,10 @@ def gui_main(helper=None, run=True):
 
     def xp_apply_css():
         from gi.repository import Gdk
+        try:   # sötét rendszertéma mellett is a világos változat (egységes megjelenés)
+            Gtk.Settings.get_default().set_property("gtk-application-prefer-dark-theme", False)
+        except Exception:
+            pass
         prov = Gtk.CssProvider()
         try:
             prov.load_from_data(XP_CSS.encode("utf-8"))
@@ -2126,13 +2343,16 @@ def gui_main(helper=None, run=True):
                 ("Rendszer", self.page_system, "system",
                  "Rendszergazdai eszközök, régi kernelek törlése és egyéb karbantartás."),
                 ("Csomagkezelő", self.page_pkg, "pkg",
-                 "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak).")]
+                 "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
+                ("Felhasználók", self.page_users, "users",
+                 "Helyi felhasználói fiókok: hozzáadás, eltávolítás, csoporttagságok és tulajdonságok szerkesztése.")]
             pages.sort(key=lambda p: hu_key(p[0]))      # az ikonok magyar ABC-sorrendben
             self.pages_meta = pages
             self.page_names = []
             self.wg_idx = [p[0] for p in pages].index("WireGuard VPN")
             self.sh_idx = [p[0] for p in pages].index("Mappamegosztás")
             self.pm_idx = [p[0] for p in pages].index("Csomagkezelő")
+            self.us_idx = [p[0] for p in pages].index("Felhasználók")
             self.pm_loaded, self.pm_seq = False, 0
             self.nav_hist, self.nav_pos = [-1], 0
 
@@ -2242,6 +2462,8 @@ def gui_main(helper=None, run=True):
                     self.sh_refresh()
                 if idx == self.pm_idx and not self.pm_loaded:
                     self.pm_on_show()
+                if idx == self.us_idx and not self.us_loaded:
+                    self.us_on_show()
             self.b_back.set_sensitive(self.nav_pos > 0)
             self.b_fwd.set_sensitive(self.nav_pos < len(self.nav_hist) - 1)
             self.b_up.set_sensitive(idx >= 0)
@@ -2304,8 +2526,14 @@ def gui_main(helper=None, run=True):
             return False
 
         def confirm(self, text):
-            d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                                  buttons=Gtk.ButtonsType.OK_CANCEL, text=text)
+            d, area = self.xp_dialog("Megerősítés", "question", "", "OK")
+            l = Gtk.Label(label=text, xalign=0)
+            l.set_line_wrap(True)
+            l.set_max_width_chars(52)
+            for m in ("top", "bottom", "start", "end"):
+                getattr(l, f"set_margin_{m}")(18)
+            area.pack_start(l, True, True, 0)
+            d.show_all()
             ok = d.run() == Gtk.ResponseType.OK
             d.destroy()
             return ok
@@ -2858,6 +3086,310 @@ def gui_main(helper=None, run=True):
             self.pm_check_flatpak()
             self.pm_load_updates()
             self.pm_update_cache_lbl()
+
+        # ------------------------------------------------ XP-s párbeszédablakok
+        def xp_banner(self, kind, title, sub=""):
+            hd = Gtk.Box(spacing=12)
+            hd.get_style_context().add_class("xp-pagehead")
+            hd.pack_start(xp_image(kind, 40), False, False, 0)
+            tx = Gtk.Box(orientation=V, spacing=2)
+            t = Gtk.Label(label=title, xalign=0)
+            t.set_line_wrap(True)
+            t.get_style_context().add_class("xp-pagetitle")
+            tx.pack_start(t, False, False, 0)
+            if sub:
+                s = Gtk.Label(label=sub, xalign=0)
+                s.set_line_wrap(True)
+                tx.pack_start(s, False, False, 0)
+            hd.pack_start(tx, True, True, 0)
+            return hd
+
+        def xp_dialog(self, title, kind, sub, ok_label):
+            d = Gtk.Dialog(title=title, transient_for=self, modal=True)
+            d.get_style_context().add_class("xp")
+            d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, ok_label, Gtk.ResponseType.OK)
+            d.set_default_response(Gtk.ResponseType.OK)
+            d.get_action_area().set_border_width(8)
+            area = d.get_content_area()
+            area.set_spacing(0)
+            area.pack_start(self.xp_banner(kind, title, sub), False, False, 0)
+            return d, area
+
+        # ------------------------------------------------ Felhasználók
+        US_GROUP_INFO = {
+            "sudo": "rendszergazdai jog (sudo)", "adm": "rendszernaplók olvasása", "audio": "hangeszközök",
+            "video": "kamera, videó, grafika", "cdrom": "CD/DVD-meghajtó", "plugdev": "cserélhető eszközök",
+            "netdev": "hálózati beállítások", "users": "általános felhasználói csoport", "dialout": "soros portok",
+            "lpadmin": "nyomtatók kezelése", "scanner": "lapolvasók", "sambashare": "Samba-megosztások létrehozása",
+            "vpn": "VPN jelszó nélküli kapcsolása", "docker": "Docker (gyakorlatilag rendszergazdai jog!)",
+            "libvirt": "virtualizáció", "kvm": "virtualizáció", "bluetooth": "Bluetooth", "wireshark": "hálózatfigyelés",
+            "systemd-journal": "rendszernapló (journal)", "input": "beviteli eszközök", "render": "grafikus gyorsítás",
+            "floppy": "hajlékonylemez-meghajtó", "fuse": "FUSE-fájlrendszerek", "staff": "helyi programtelepítés"}
+        US_DEFAULT_GROUPS = ("audio", "video", "cdrom", "plugdev", "netdev")
+
+        def page_users(self):
+            b = self.mk_page("Felhasználók",
+                             "A helyi felhasználói fiókok kezelése: hozzáadás, eltávolítás, csoporttagságok (jogok) "
+                             "és tulajdonságok szerkesztése. Rendszergazdai hitelesítés után használható.")
+            self.us_data = {"users": [], "groups": [], "shells": []}
+            self.us_loaded = False
+            ar = Gtk.Box(spacing=10)
+            self.us_hint = self.lab("A felhasználók kezeléséhez rendszergazdai hitelesítés szükséges.")
+            self.us_auth = self.btn("Hitelesítés és a lista betöltése", self.us_refresh)
+            ar.pack_start(self.us_hint, True, True, 0)
+            ar.pack_start(self.us_auth, False, False, 0)
+            b.pack_start(ar, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.us_b_new = self.btn("Új felhasználó…", self.us_new)
+            self.us_b_edit = self.btn("Szerkesztés…", self.us_edit)
+            self.us_b_del = self.btn("Eltávolítás…", self.us_delete)
+            self.us_chk_sys = Gtk.CheckButton(label="Rendszerfiókok mutatása")
+            self.us_chk_sys.connect("toggled", self.us_render)
+            for w in (self.us_b_new, self.us_b_edit, self.us_b_del, self.us_chk_sys):
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            self.us_store = Gtk.ListStore(str, str, str, str, str, str)
+            self.us_tv, sw = self.pm_list_view(self.us_store, [
+                ("Felhasználó", 0, False, False, 0), ("Teljes név", 1, False, True, 1),
+                ("UID", 2, False, False, 2), ("Csoportok", 3, False, True, 3),
+                ("Parancsértelmező", 4, False, False, 4), ("Állapot", 5, True, False, None)])
+            self.us_tv.get_selection().connect("changed", self.us_set_sensitivity)
+            self.us_tv.connect("row-activated", lambda *_: self.us_edit())
+            b.pack_start(sw, True, True, 0)
+            self.us_set_sensitivity()
+            return b
+
+        def us_me(self):
+            try:
+                return pwd.getpwuid(os.getuid()).pw_name
+            except KeyError:
+                return ""
+
+        def us_selected(self):
+            model, it = self.us_tv.get_selection().get_selected()
+            if not it:
+                return None
+            for u in self.us_data["users"]:
+                if u["name"] == model[it][0]:
+                    return u
+            return None
+
+        def us_regular(self, u):
+            return US_UID_MIN <= u["uid"] < US_UID_MAX
+
+        def us_set_sensitivity(self, *_):
+            ok = self.us_loaded
+            self.us_b_new.set_sensitive(ok)
+            self.us_chk_sys.set_sensitive(ok)
+            u = self.us_selected() if ok else None
+            self.us_b_edit.set_sensitive(bool(u and self.us_regular(u)))
+            self.us_b_del.set_sensitive(bool(u and self.us_regular(u) and u["name"] != self.us_me()))
+
+        def us_render(self, *_):
+            sel = self.us_selected()
+            self.us_store.clear()
+            me = self.us_me()
+            show_sys = self.us_chk_sys.get_active()
+            for u in sorted(self.us_data["users"], key=lambda x: x["uid"]):
+                regular = self.us_regular(u)
+                if not (regular or show_sys):
+                    continue
+                if not regular:
+                    state = "rendszerfiók"
+                elif u["locked"]:
+                    state = '<span foreground="#b45309">zárolva</span>'
+                else:
+                    state = "aktív"
+                if u["name"] == me:
+                    state += " (te)"
+                self.us_store.append([u["name"], u["full"], str(u["uid"]), ", ".join([u["group"]] + u["groups"]),
+                                      u["shell"], state])
+            if sel:
+                for row in self.us_store:
+                    if row[0] == sel["name"]:
+                        self.us_tv.get_selection().select_iter(row.iter)
+            self.us_set_sensitivity()
+
+        def us_refresh(self, *_):
+            self.run_task([("user_list", {})], self.us_done)
+
+        def us_done(self, rc, msg, data):
+            if rc == 0 and isinstance(data, dict):
+                self.us_data = data
+                self.us_loaded = True
+                self.us_hint.set_text("✔ Hitelesítve. A módosításokhoz a rendszer újabb jelszót nem kér ebben a munkamenetben.")
+                self.us_auth.set_label("Lista frissítése")
+                self.us_render()
+            elif not self.us_loaded:
+                self.us_hint.set_text("⚠ A hitelesítés nem sikerült, vagy a lista nem tölthető be. Próbáld újra.")
+            self.us_set_sensitivity()
+
+        def us_form(self, user=None):
+            editing = user is not None
+            title = f"Felhasználó szerkesztése: {user['name']}" if editing else "Új felhasználó"
+            d, area = self.xp_dialog(title, "users",
+                                     "A módosítások a mentés után azonnal érvénybe lépnek." if editing
+                                     else "Add meg az új fiók adatait és jogait.",
+                                     "Mentés" if editing else "Létrehozás")
+            d.set_default_size(580, -1)
+            g = Gtk.Grid(column_spacing=10, row_spacing=8)
+            g.set_border_width(16)
+            area.pack_start(g, True, True, 0)
+
+            def row(r, text, w):
+                g.attach(Gtk.Label(label=text, xalign=1), 0, r, 1, 1)
+                w.set_hexpand(True)
+                g.attach(w, 1, r, 1, 1)
+            e_name = Gtk.Entry()
+            e_name.set_placeholder_text("pl. kovacs.janos (kisbetű, szám, _ és -)")
+            e_full = Gtk.Entry()
+            e_full.set_placeholder_text("pl. Kovács János")
+            e_pw, e_pw2 = Gtk.Entry(), Gtk.Entry()
+            for e in (e_pw, e_pw2):
+                e.set_visibility(False)
+            e_pw.set_placeholder_text("(üresen hagyva nem változik)" if editing else "legalább 6 karakter")
+            shells = list(self.us_data.get("shells") or ["/bin/bash"])
+            cur_shell = user["shell"] if editing else "/bin/bash"
+            if cur_shell not in shells:
+                shells.append(cur_shell)
+            cb_shell = Gtk.ComboBoxText()
+            for sh in shells:
+                cb_shell.append_text(sh)
+            cb_shell.set_active(shells.index(cur_shell) if cur_shell in shells else 0)
+            if editing:
+                e_name.set_text(user["name"])
+                e_name.set_sensitive(False)
+                e_full.set_text(user["full"])
+            row(0, "Felhasználónév:", e_name)
+            row(1, "Teljes név:", e_full)
+            row(2, "Jelszó:" if not editing else "Új jelszó:", e_pw)
+            row(3, "Jelszó még egyszer:", e_pw2)
+            row(4, "Parancsértelmező:", cb_shell)
+            chk_lock = Gtk.CheckButton(label="Fiók zárolása (nem tud belépni)")
+            chk_force = Gtk.CheckButton(label="Jelszócsere kötelező a következő belépéskor")
+            chk_home = Gtk.CheckButton(label="Saját mappa létrehozása")
+            chk_home.set_active(True)
+            opts = Gtk.Box(orientation=V, spacing=4)
+            if editing:
+                chk_lock.set_active(user["locked"])
+                opts.pack_start(chk_lock, False, False, 0)
+            else:
+                opts.pack_start(chk_home, False, False, 0)
+            opts.pack_start(chk_force, False, False, 0)
+            g.attach(opts, 1, 5, 1, 1)
+            # --- csoporttagságok (jogok)
+            hl = Gtk.Label(xalign=0)
+            hl.set_markup("<b>Csoporttagságok (jogok)</b>")
+            hl.get_style_context().add_class("xp-head")
+            hl.set_margin_top(6)
+            g.attach(hl, 0, 6, 2, 1)
+            groups = [x for x in self.us_data.get("groups", []) if not (editing and x["name"] == user["group"])]
+            initial = set(user["groups"]) if editing else set()
+            state = {x["name"]: ((x["name"] in initial) if editing else (x["name"] in self.US_DEFAULT_GROUPS))
+                     for x in groups}
+            gstore = Gtk.ListStore(bool, str, str)
+            gtv = Gtk.TreeView(model=gstore)
+            tog = Gtk.CellRendererToggle()
+
+            def on_tog(_c, path):
+                r = gstore[path]
+                r[0] = not r[0]
+                state[r[1]] = r[0]
+            tog.connect("toggled", on_tog)
+            gtv.append_column(Gtk.TreeViewColumn("", tog, active=0))
+            c1 = Gtk.TreeViewColumn("Csoport", Gtk.CellRendererText(), text=1)
+            c1.set_sort_column_id(1)
+            gtv.append_column(c1)
+            gtv.append_column(Gtk.TreeViewColumn("Mire jogosít", Gtk.CellRendererText(), text=2))
+            gsw = Gtk.ScrolledWindow()
+            gsw.get_style_context().add_class("xp-list")
+            gsw.set_min_content_height(190)
+            gsw.add(gtv)
+            g.attach(gsw, 0, 7, 2, 1)
+            chk_all = Gtk.CheckButton(label="Az összes csoport mutatása (a rendszercsoportokat is)")
+            g.attach(chk_all, 0, 8, 2, 1)
+
+            def fill(*_):
+                gstore.clear()
+                for x in sorted(groups, key=lambda y: y["name"]):
+                    n = x["name"]
+                    if chk_all.get_active() or x["gid"] >= US_UID_MIN or n in self.US_GROUP_INFO or state.get(n):
+                        gstore.append([state[n], n, self.US_GROUP_INFO.get(n, "")])
+            chk_all.connect("toggled", fill)
+            fill()
+            err = Gtk.Label(xalign=0)
+            err.set_line_wrap(True)
+            err.set_margin_start(16)
+            err.set_margin_end(16)
+            area.pack_start(err, False, False, 4)
+            d.show_all()
+            while True:
+                if d.run() != Gtk.ResponseType.OK:
+                    d.destroy()
+                    return None
+                name, p1, p2 = e_name.get_text().strip(), e_pw.get_text(), e_pw2.get_text()
+                msg = ""
+                if not editing and not re.match(r"^[a-z_][a-z0-9_-]{0,31}$", name):
+                    msg = "Érvénytelen felhasználónév: kisbetűvel vagy _ jellel kezdődjön, csak kisbetű, szám, _ és - lehet."
+                elif re.search(r"[:,]", e_full.get_text()):
+                    msg = "A teljes név nem tartalmazhat kettőspontot vagy vesszőt."
+                elif (not editing or p1 or p2) and p1 != p2:
+                    msg = "A két jelszó nem egyezik."
+                elif (not editing or p1) and not 6 <= len(p1) <= 128:
+                    msg = "A jelszó legalább 6 karakter legyen."
+                if msg:
+                    err.set_markup(f'<span foreground="#b91c1c">⚠ {msg}</span>')
+                    continue
+                break
+            chosen = {n for n, v in state.items() if v}
+            res = {"name": name, "fullname": e_full.get_text().strip(), "shell": cb_shell.get_active_text(),
+                   "password": p1, "force_change": chk_force.get_active(),
+                   "add_groups": sorted(chosen - initial), "rm_groups": sorted(initial - chosen)}
+            if editing:
+                res["locked"] = chk_lock.get_active()
+            else:
+                res["create_home"] = chk_home.get_active()
+            d.destroy()
+            return res
+
+        def us_new(self, *_):
+            data = self.us_form()
+            if data:
+                self.run_task([("user_add", data)], self.us_done)
+
+        def us_edit(self, *_):
+            u = self.us_selected()
+            if not u or not self.us_regular(u):
+                return
+            data = self.us_form(u)
+            if data:
+                self.run_task([("user_edit", data)], self.us_done)
+
+        def us_delete(self, *_):
+            u = self.us_selected()
+            if not u or not self.us_regular(u) or u["name"] == self.us_me():
+                return
+            d, area = self.xp_dialog("Felhasználó eltávolítása", "users", "", "Eltávolítás")
+            box = Gtk.Box(orientation=V, spacing=10)
+            box.set_border_width(18)
+            l = self.lab(f"Eltávolítod a(z) {u['name']} ({u['full'] or 'név nélkül'}) felhasználót?")
+            chk = Gtk.CheckButton(label=f"A saját mappa ({u['home']}) és a levelek törlése is "
+                                        "(nem vonható vissza)")
+            box.pack_start(l, False, False, 0)
+            box.pack_start(chk, False, False, 0)
+            area.pack_start(box, True, True, 0)
+            d.show_all()
+            ok = d.run() == Gtk.ResponseType.OK
+            rm = chk.get_active()
+            d.destroy()
+            if ok:
+                self.run_task([("user_delete", {"name": u["name"], "remove_home": rm})], self.us_done)
+
+        def us_on_show(self):
+            # ha a segéd már hitelesítve fut (korábbi művelet), a lista jelszó nélkül betölthető
+            p = getattr(self.h, "p", None)
+            if not self.us_loaded and p is not None and p.poll() is None:
+                self.us_refresh()
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
@@ -3716,6 +4248,7 @@ def gui_main(helper=None, run=True):
         # --- Samba-jelszavak
         def sh_setpw(self, user):
             d = Gtk.Dialog(title=f"Samba-jelszó: {user}", transient_for=self, modal=True)
+            d.get_style_context().add_class("xp")
             d.add_buttons("Mégse", Gtk.ResponseType.CANCEL, "Beállítás", Gtk.ResponseType.OK)
             d.set_default_response(Gtk.ResponseType.OK)
             area = d.get_content_area()
