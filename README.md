@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://drive.google.com/drive/folders/1QRUDmG91F10liZ2EVjozCtnPbFq07ill">Letöltés</a> ·
+  <a href="https://drive.google.com/drive/folders/1QRUDmG91F10liZ2EVjozCtnPbFq07ill">Letöltés</a>
 </p>
 
 ---
@@ -19,15 +19,14 @@
 
 A Kolibri Linux egy Debian 13 (trixie) alapú, magyar nyelvű, élő és telepíthető Linux-rendszer. A célja, hogy az első percben otthonos legyen mindenkinek, aki Windowsról érkezik: alul a tálca, balra a Start menü, magyar nyelv és billentyűzet alapból, a programok pedig egy grafikus szoftverközpontból, kattintásra telepíthetők.
 
-A rendszer iskolai és oktatási környezetbe készült, de bárki használhatja, aki szeretne megismerkedni a Linuxszal, vagy szabad és adatvédelmi szempontból tudatos rendszert keres. A projekt hivatalos oldala: **<https://sleepy.hu/>**
+A rendszer mindennapos felhasználásra készült, bárki használhatja, aki szeretne megismerkedni a Linuxszal, vagy szabad és adatvédelmi szempontból tudatos rendszert keres. 
 
 ## Főbb jellemzők
 
 - **Debian-alapú stabilitás.** A stabil ágra épül, automatikus biztonsági frissítésekkel.
-- **Visszaállíthatóság.** A Timeshift segítségével a rendszer bármikor visszaállítható egy korábbi állapotba.
 - **Kezdőbarát.** Windows-szerű asztal, magyar nyelv és billentyűzet, egyszerű telepítő, grafikus szoftverközpont.
 - **Adatvédelem.** Előtelepített titkosító és privát kommunikációs eszközök.
-- **Kipróbálható telepítés nélkül.** Élő rendszerként vagy virtuális gépben (például VirtualBoxban) is futtatható.
+- **Kipróbálható telepítés nélkül.** LIVE rendszerként vagy virtuális gépben (például VirtualBoxban) is futtatható.
 - **Haladóknak is.** Bash, rendszergazdai feladatok, scriptelés: a mélységre mindig van lehetőség.
 - **Szabad és ingyenes.** Nem kell hozzá licenc és regisztráció.
 
@@ -55,12 +54,6 @@ A rendszer iskolai és oktatási környezetbe készült, de bárki használhatja
 | [VeraCrypt](https://veracrypt.io/en/Home.html) | hivatalos Debian 13 csomag |
 | [Tuta Mail](https://tuta.com/hu) | Flatpak |
 | [LocalSend](https://localsend.org/) | Flatpak |
-
-## Letöltés és telepítés
-
-Az ISO-képfájl és a telepítési útmutató a projekt weboldalán érhető el.
-
-Az ISO-fájlt írhatod USB-meghajtóra, vagy indíthatod virtuális gépből. Telepítés nélkül, élő rendszerként is kipróbálható.
 
 ## Fordítás (build)
 
@@ -101,7 +94,7 @@ qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 \
 - `tools/gen_assets.py` újragenerálja a képeket: Plymouth logó, GRUB háttér (1920×1080), syslinux háttér (640×480). Az előnézet a `tools/preview/` mappában található.
 - Plymouth téma: `config/includes.chroot/usr/share/plymouth/themes/kolibri/`
 - GRUB (telepített rendszer): `config/includes.chroot/etc/default/grub.d/zz-kolibri.cfg`
-- Élő ISO menü: `config/bootloaders/{grub-pc,syslinux}/splash.png`
+- LIVE ISO menü: `config/bootloaders/{grub-pc,syslinux}/splash.png`
 - Az arculati változtatások kipróbálásához indítsd el az ISO-t virtuális gépben.
 
 ## Asztal és alkalmazások
@@ -110,10 +103,6 @@ qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 \
 - **Háttér és bejelentkező képernyő.** Ugyanaz a kép, mint a GRUB-ban: `/usr/share/backgrounds/kolibri/background.png`
 - **Alkalmazások letöltése.** A `build.sh` és a `config/hooks/live/0050-apps.hook.chroot` tartalmazza a külső forrásból érkező programok telepítését.
 - **VeraCrypt.** A `.deb` csomag nem frissül magától: új verzióhoz új ISO kell, vagy kézi telepítés.
-
-## Hozzájárulás
-
-Hibát találtál, vagy van ötleted? Írj a projekt weboldalán található [kapcsolati oldalon](https://sleepy.hu/kapcsolat.php). Csomaglista-módosításokat, fordításokat és arculati javaslatokat is szívesen fogadunk.
 
 ## Licenc és jogi tudnivalók
 
@@ -125,4 +114,4 @@ A projekt AI felhasználásával készült, annak képességeinek megismerése c
 
 ## Szerző
 
-© 2026 Major Szabolcs · <https://sleepy.hu/>
+© 2026 Major Szabolcs
