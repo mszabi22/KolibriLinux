@@ -10,9 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://sleepy.hu/">Weboldal</a> ·
   <a href="https://drive.google.com/drive/folders/1QRUDmG91F10liZ2EVjozCtnPbFq07ill">Letöltés</a> ·
-  <a href="https://sleepy.hu/kapcsolat.php">Kapcsolat</a>
 </p>
 
 ---
