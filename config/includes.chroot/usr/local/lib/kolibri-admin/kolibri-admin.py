@@ -466,7 +466,8 @@ def op_login(r):
 
 
 PKG_WHITELIST = {"chrony", "nextcloud-desktop", "wireguard-tools", "samba", "cups", "system-config-printer",
-                 "xfce4-settings", "veyon-service", "veyon-configurator"}
+                 "xfce4-settings", "veyon-service", "veyon-configurator",
+                 "xfce4-screensaver", "light-locker", "light-locker-settings"}
 
 
 def op_pkg(r):
@@ -2209,6 +2210,33 @@ def vpn_direct():
 
 KJ_TOOLS = ("xfce4-display-settings", "arandr", "lxrandr")
 FW_BIN = "/usr/local/bin/kolibri-tuzfal"      # a Kolibri tűzfal parancsa
+SV_TOOLS = (("xfce4-screensaver-preferences", "xfce4-screensaver"),
+            ("xscreensaver-settings", "xscreensaver"))          # (beállító program, háttérfolyamat)
+SV_PROCS = ("xfce4-screensaver", "xscreensaver", "light-locker")
+SV_LEGACY = ("light-locker", "light-locker-settings")           # az Xfce 4.20 óta nem támogatott, ütközik az újjal
+
+
+def sv_tool():
+    """Az első telepített képernyővédő-beállító: (parancs, folyamatnév) vagy None."""
+    for exe, proc in SV_TOOLS:
+        if shutil.which(exe):
+            return exe, proc
+    return None
+
+
+def sv_running():
+    out = []
+    for proc in SV_PROCS:
+        try:
+            if subprocess.run(["pgrep", "-x", proc], capture_output=True).returncode == 0:
+                out.append(proc)
+        except OSError:
+            break
+    return out
+
+
+def sv_legacy():
+    return [p for p in SV_LEGACY if pkg_ok(p)]
 
 
 def kj_tool():
@@ -2389,6 +2417,14 @@ XP_SVG["fw"] = ('<rect x="4" y="16" width="40" height="27" fill="#c8502d" stroke
                 'fill="#ff9a1a" stroke="#c2570a"/>'
                 '<path d="M24 11 C26 14 28 15 27 18 C26 20 22 20 21 18 C21 16 23 15 24 11 Z" fill="#ffe36a"/>')
 XP_FALLBACK_ICON["fw"] = "security-high"
+XP_SVG["screensaver"] = ('<rect x="7" y="5" width="34" height="24" rx="2" fill="url(#b)" stroke="#6e6a58"/>'
+                        '<rect x="10" y="8" width="28" height="18" fill="#12205a" stroke="#0b1440"/>'
+                        '<path d="M27 11 A7 7 0 1 0 33 21 A5.5 5.5 0 1 1 27 11 Z" fill="#ffe36a"/>'
+                        '<circle cx="15" cy="12" r="1" fill="#fff"/><circle cx="21" cy="21" r="1" fill="#fff"/>'
+                        '<circle cx="34" cy="12" r="1" fill="#fff"/>'
+                        '<rect x="20" y="29" width="8" height="5" fill="#a8a493"/>'
+                        '<rect x="13" y="34" width="22" height="4" rx="2" fill="url(#b)" stroke="#6e6a58"/>')
+XP_FALLBACK_ICON["screensaver"] = "preferences-desktop-screensaver"
 XP_CSS = """
 window.xp, window.xp.background, window.xp.dialog { background-color: #ECE9D8; background-image: none; color: #000000; }
 .xp box, .xp grid, .xp buttonbox, .xp .dialog-vbox, .xp .dialog-action-area { background-color: transparent; background-image: none; }
@@ -2562,6 +2598,8 @@ def gui_main(helper=None, run=True):
                  "Programok keresése, telepítése, eltávolítása, rendszerfrissítés és takarítás (apt és Flatpak)."),
                 ("Tűzfal", self.page_firewall, "fw",
                  "Az iptables tűzfal egyszerű, grafikus kezelése (Kolibri tűzfal)."),
+                ("Képernyővédő", self.page_screensaver, "screensaver",
+                 "A képernyővédő és a képernyőzár beállítása (indulási idő, megjelenés, zárolás)."),
                 ("Kijelző", self.page_display, "display",
                  "A képernyő beállítása: felbontás, képfrissítés, tájolás, több monitor (kijelzőbeállító)."),
                 ("Vezérlőpult frissítése", self.page_update, "update",
@@ -2901,6 +2939,27 @@ def gui_main(helper=None, run=True):
                                       "első indításkor beépül a rendszerbe.")
             if hasattr(self, "up_inst"):
                 self.up_show_installed()
+            if hasattr(self, "sv_btn"):
+                t, legacy, run = sv_tool(), sv_legacy(), sv_running()
+                self.sv_btn.set_sensitive(bool(t))
+                self.sv_inst.set_sensitive(not t)
+                self.sv_fix.set_sensitive(bool(legacy) and bool(t))
+                self.sv_lbl.set_text(("● Fut: " + ", ".join(run) + ".") if run else
+                                     "○ A képernyővédő szolgáltatás most nem fut (telepítés után a következő "
+                                     "bejelentkezéskor indul el).")
+                if legacy and t:
+                    warn = (f"⚠ A(z) {', '.join(legacy)} az {t[1]} mellett ütközhet (dupla zárolás, hibásan működő "
+                            "időzítés). Javasolt eltávolítani: a „light-locker eltávolítása” gomb ezt elvégzi.")
+                elif legacy:
+                    warn = ("⚠ Csak a light-locker van telepítve: az Xfce 4.20 óta ez már nem állítható a "
+                            "beállítóból. Telepítsd az xfce4-screensaver programot, a light-locker ilyenkor "
+                            "eltávolításra kerül.")
+                else:
+                    warn = ""
+                self.sv_warn.set_text(warn)
+                self.sv_hint.set_text(f"A megnyitandó program: {t[0]}." if t else
+                                      "⚠ Nincs használható képernyővédő-beállító program telepítve: telepítsd az "
+                                      "alábbi gombbal.")
             if hasattr(self, "kj_btn"):
                 tool = kj_tool()
                 self.kj_btn.set_sensitive(bool(tool))
@@ -3871,6 +3930,56 @@ def gui_main(helper=None, run=True):
                 self.say(1, f"A tűzfalprogram nem indítható: {e}")
                 return
             self.say(0, "A tűzfalprogram megnyílt (a módosításokhoz a program maga kér jelszót).")
+
+        # ------------------------------------------------ Képernyővédő (xfce4-screensaver)
+        def page_screensaver(self):
+            b = self.mk_page("Képernyővédő",
+                             "A képernyővédő és a képernyőzár beállítása: indulási idő, megjelenés, zárolás.")
+            self.head(b, "Állapot")
+            self.sv_lbl = self.lab("")
+            b.pack_start(self.sv_lbl, False, False, 0)
+            self.sv_warn = self.lab("")
+            b.pack_start(self.sv_warn, False, False, 0)
+            self.head(b, "Beállítás")
+            self.sv_hint = self.lab("")
+            b.pack_start(self.sv_hint, False, False, 0)
+            bar = Gtk.Box(spacing=8)
+            self.sv_btn = self.btn("Képernyővédő beállításainak megnyitása", self.sv_open)
+            self.sv_inst = self.btn("Képernyővédő telepítése", self.sv_install)
+            self.sv_fix = self.btn("light-locker eltávolítása", self.sv_remove_legacy)
+            for w in (self.sv_btn, self.sv_inst, self.sv_fix):
+                bar.pack_start(w, False, False, 0)
+            b.pack_start(bar, False, False, 0)
+            return b
+
+        def sv_open(self, *_):
+            t = sv_tool()
+            if not t:
+                self.say(1, "Nincs képernyővédő-beállító program telepítve: előbb telepítsd.")
+                return
+            try:
+                subprocess.Popen([t[0]], start_new_session=True)
+            except OSError as e:
+                self.say(1, f"A beállító nem indítható: {e}")
+                return
+            self.say(0, "A képernyővédő beállításai megnyíltak.")
+
+        def sv_install(self, *_):
+            legacy = sv_legacy()
+            text = "Telepítem az xfce4-screensaver csomagot (képernyővédő és képernyőzár)?"
+            steps = [("pkg", {"action": "install", "pkgs": ["xfce4-screensaver"]})]
+            if legacy:
+                text += (f"\n\nA(z) {', '.join(legacy)} el lesz távolítva, mert a két program együtt ütközik "
+                         "(dupla zárolás, nem állítható időzítés).")
+                steps.append(("pkg", {"action": "remove", "pkgs": legacy}))
+            if self.confirm(text):
+                self.run_task(steps)
+
+        def sv_remove_legacy(self, *_):
+            legacy = sv_legacy()
+            if legacy and self.confirm(f"Eltávolítom a(z) {', '.join(legacy)} csomagot?\n\nAz xfce4-screensaver "
+                                       "marad az egyetlen képernyővédő és képernyőzár."):
+                self.run_task([("pkg", {"action": "remove", "pkgs": legacy})])
 
         # ------------------------------------------------ Bejelentkező ablak
         def page_login(self):
