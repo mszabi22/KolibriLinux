@@ -3,7 +3,7 @@
 set -e
 
 # Arculat: a kompatibilitás miatt az ID marad debian, csak a megjelenő név változik
-sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Kolibri Linux 1.0 (Debian 13)"/' /etc/os-release
+sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Kolibri Linux"/' /etc/os-release
 echo "Kolibri Linux \n \l" > /etc/issue
 
 # Flathub hozzáadása (build közben kell hálózat)
