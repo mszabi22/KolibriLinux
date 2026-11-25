@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolibri Linux</title>
+<meta name="description" content="Kolibri Linux: stabil, egyszerű, kezdőbarát magyar Linux Debian alapon, Windows-szerű asztallal.">
+<meta name="theme-color" content="#06111e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpolygon fill='%233A7CA5' points='236,246 300,236 404,96 468,40 440,170 352,282'/%3E%3Cpolygon fill='%231B8F8A' points='330,372 372,318 462,444 418,478'/%3E%3Cpolygon fill='%232EC4B6' points='206,262 236,222 312,252 372,318 330,372 246,332'/%3E%3Cpolygon fill='%237EE0D6' points='120,232 152,192 206,186 240,222 222,270 162,270'/%3E%3Cpolygon fill='%23E8EEF4' points='32,250 130,224 134,244'/%3E%3Cpolygon fill='%23F4B942' points='134,244 162,270 206,262 176,246'/%3E%3C/svg%3E">
+<style>
+  /* A színek és a betűtípus ugyanaz, mint a Kolibri Linux rendszerben.
+     Külső betűtípust nem töltünk be: a Noto Sans a rendszer alapfonja, máshol a DejaVu/rendszerfont lép be. */
+  :root {
+    --navy-top: #0d2136;
+    --navy-bot: #06111e;
+    --panel: rgba(255,255,255,0.04);
+    --line: rgba(255,255,255,0.10);
+    --teal: #2ec4b6;
+    --teal-d: #1b8f8a;
+    --teal-l: #7ee0d6;
+    --blue: #3a7ca5;
+    --amber: #f4b942;
+    --text: #e8eef4;
+    --muted: #8ca0b4;
+    --font: "Noto Sans", "DejaVu Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --wrap: 1120px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { background: var(--navy-bot); scroll-behavior: smooth; }
+
+  body {
+    min-height: 100vh;
+    background: linear-gradient(180deg, var(--navy-top) 0%, var(--navy-bot) 70%) no-repeat;
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 1rem;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+
+  .wrap { width: min(var(--wrap), 100% - 12vw); margin-inline: auto; }
+
+  /* ── Fejléc ─────────────────────────────────────── */
+  .brandbar { padding: 22px 0 0; }
+  .brandbar .wrap { display: flex; align-items: center; gap: 12px; }
+  .brandbar svg { width: 34px; height: 34px; }
+  .brandbar b { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; }
+
+  /* ── Hero ───────────────────────────────────────── */
+  .hero { padding: 56px 0 96px; }
+  .hero .wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: clamp(32px, 5vw, 72px);
+    align-items: center;
+  }
+
+  h1 {
+    font-size: clamp(2.8rem, 5.6vw, 4.6rem);
+    font-weight: 800;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+  }
+
+  .tagline {
+    margin-top: 14px;
+    font-size: 1.05rem;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+  }
+
+  .hero-lead {
+    margin: 26px 0 34px;
+    max-width: 30em;
+    font-size: 1.15rem;
+    color: var(--text);
+  }
+
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 24px;
+    border-radius: 6px;
+    font: 700 0.95rem/1 var(--font);
+    text-decoration: none;
+    border: 2px solid var(--teal);
+    transition: background-color .15s, border-color .15s, color .15s;
+  }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .btn-primary { background: var(--teal); color: var(--navy-bot); }
+  .btn-primary:hover { background: var(--teal-l); border-color: var(--teal-l); }
+  .btn-outline { background: transparent; color: var(--teal-l); }
+  .btn-outline:hover { background: rgba(46,196,182,0.12); }
+
+  .hero-note { margin-top: 18px; font-size: 0.9rem; color: var(--muted); }
+
+  /* ── Asztal-minta (a rendszer valódi elrendezése) ── */
+  .desk {
+    container-type: inline-size;
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, #0d2136, #06111e);
+    box-shadow: 0 40px 90px rgba(0,0,0,0.55), 0 0 0 1px rgba(46,196,182,0.06);
+    overflow: hidden;
+    user-select: none;
+  }
+  .desk .ghost { position: absolute; right: -9cqw; bottom: -4cqw; width: 62cqw; opacity: 0.07; }
+  .desk .wall {
+    position: absolute; top: 7cqw; left: 0; right: 0;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .desk .wall svg { width: 12cqw; height: 12cqw; }
+  .desk .wall b { margin-top: 1cqw; font-size: 5.2cqw; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+  .desk .wall span { margin-top: 1cqw; font-size: 1.9cqw; font-weight: 300; color: var(--muted); }
+
+  .bar {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 7.2cqw;
+    display: flex; align-items: center; gap: 1.2cqw;
+    padding: 0 1.2cqw 0 0;
+    background: rgba(8,20,34,0.94);
+    border-top: 1px solid var(--line);
+  }
+  .bar .start { width: 7.2cqw; height: 100%; display: grid; place-items: center; background: rgba(46,196,182,0.14); }
+  .bar .start svg { width: 4.6cqw; height: 4.6cqw; }
+  .bar .launch { width: 4.4cqw; height: 4.4cqw; border-radius: 0.9cqw; display: grid; place-items: center; font-size: 2cqw; font-weight: 800; }
+  .bar .task {
+    display: flex; align-items: center; gap: 1cqw;
+    height: 100%; padding: 0 2cqw; margin-left: 0.8cqw;
+    font-size: 2cqw; color: var(--text);
+    background: rgba(255,255,255,0.07);
+    border-bottom: 0.45cqw solid var(--teal);
+  }
+  .bar .task i { width: 2.6cqw; height: 2.6cqw; border-radius: 0.6cqw; background: #f26a3d; display: block; }
+  .bar .grow { flex: 1; }
+  .bar .tray { display: flex; gap: 1cqw; align-items: center; }
+  .bar .tray i { width: 2cqw; height: 2cqw; border-radius: 50%; background: var(--muted); opacity: 0.8; display: block; }
+  .bar .clock { margin-left: 1cqw; text-align: right; font-size: 1.8cqw; line-height: 1.25; color: var(--text); }
+  .bar .clock small { display: block; font-size: 1.5cqw; color: var(--muted); }
+
+  .menu {
+    position: absolute; left: 1.2cqw; bottom: 8.2cqw;
+    width: 33cqw;
+    padding: 1.1cqw;
+    background: rgba(9,24,40,0.97);
+    border: 1px solid var(--line);
+    border-radius: 1cqw;
+    box-shadow: 0 2cqw 5cqw rgba(0,0,0,0.5);
+  }
+  .menu .search {
+    padding: 1.2cqw 1.6cqw; margin-bottom: 1cqw;
+    font-size: 1.9cqw; color: var(--muted);
+    background: rgba(255,255,255,0.06); border-radius: 0.7cqw;
+  }
+  .menu ul { list-style: none; }
+  .menu li { display: flex; align-items: center; gap: 1.4cqw; padding: 0.9cqw 1.2cqw; font-size: 2cqw; border-radius: 0.7cqw; }
+  .menu li.on { background: rgba(46,196,182,0.18); }
+  .menu li b { width: 3.4cqw; height: 3.4cqw; border-radius: 0.8cqw; display: grid; place-items: center; font-size: 1.8cqw; color: var(--navy-bot); flex: none; }
+
+  /* Az egyetlen mozgás az oldalon: a Start menü kinyílik az első betöltéskor. */
+  @keyframes open { from { opacity: 0; transform: translateY(2.4cqw); } to { opacity: 1; transform: none; } }
+  .menu { animation: open .55s cubic-bezier(.2,.7,.2,1) .7s both; }
+
+  /* ── Szakaszok ──────────────────────────────────── */
+  section.block { padding: 84px 0; border-top: 1px solid var(--line); }
+  h2 {
+    font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+    font-weight: 800;
+    line-height: 1.12;
+    letter-spacing: -0.025em;
+    max-width: 18em;
+  }
+  .lead { margin-top: 16px; max-width: 34em; color: var(--muted); font-size: 1.08rem; }
+
+  /* Előnyök: címke bal oldalon, szöveg jobb oldalon, vékony vonallal elválasztva */
+  .rows { margin-top: 44px; border-top: 1px solid var(--line); }
+  .row {
+    display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 32px;
+    padding: 26px 0; border-bottom: 1px solid var(--line);
+  }
+  .row h3 { font-size: 1.12rem; font-weight: 700; color: var(--teal-l); }
+  .row p { color: var(--muted); max-width: 36em; }
+
+  /* Kinek szól + Debian */
+  .who { margin-top: 44px; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
+  .who-list { list-style: none; display: grid; gap: 26px; }
+  .who-list li { padding-left: 20px; border-left: 3px solid var(--teal-d); }
+  .who-list b { display: block; font-size: 1.05rem; margin-bottom: 2px; }
+  .who-list span { color: var(--muted); }
+
+  .aside {
+    padding: 32px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--amber);
+    border-radius: 4px;
+    position: sticky; top: 24px;
+  }
+  .aside h3 { font-size: 1.3rem; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 12px; }
+  .aside p { color: var(--muted); margin-bottom: 22px; }
+  .chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips li {
+    padding: 4px 12px; font-size: 0.88rem;
+    color: var(--teal-l);
+    background: rgba(46,196,182,0.10);
+    border: 1px solid rgba(46,196,182,0.25);
+    border-radius: 100px;
+  }
+
+  /* Telepített alkalmazások */
+  .apps { margin-top: 36px; }
+  .apps .chips li { padding: 7px 16px; font-size: 0.98rem; color: var(--text); background: var(--panel); border-color: var(--line); }
+
+  /* Letöltés */
+  .get { text-align: center; padding: 96px 0 104px; }
+  .get svg.bird { width: 76px; height: 76px; margin: 0 auto 18px; display: block; }
+  .get h2 { margin-inline: auto; }
+  .get .lead { margin-inline: auto; }
+  .get .cta { justify-content: center; margin-top: 34px; }
+
+  footer { border-top: 3px solid var(--teal); background: rgba(0,0,0,0.25); padding: 26px 0; font-size: 0.9rem; color: var(--muted); }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  footer a { text-decoration: none; }
+  footer a:hover { color: var(--teal-l); }
+
+
+  /* Képernyőképek */
+  [hidden] { display: none !important; }
+  .shots { margin-top: 44px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .shots figure:first-child { grid-column: 1 / -1; }
+  .shots button {
+    display: block; width: 100%; padding: 0; cursor: zoom-in;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    transition: border-color .15s;
+  }
+  .shots button:hover { border-color: var(--teal-d); }
+  .shots img { display: block; width: 100%; height: auto; }
+  .shots figcaption { margin-top: 10px; font-size: 0.95rem; color: var(--muted); }
+  #lb { margin: auto; max-width: min(96vw, 1400px); background: var(--navy-bot); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 0; overflow: hidden; }
+  #lb::backdrop { background: rgba(3,9,16,0.88); }
+  #lb img { display: block; max-width: 100%; max-height: 84vh; margin: 0 auto; }
+  #lb p { padding: 12px 18px; color: var(--muted); font-size: 0.95rem; }
+
+  /* ── Mobil ──────────────────────────────────────── */
+  @media (max-width: 860px) {
+    .hero { padding: 36px 0 64px; }
+    .hero .wrap, .who { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 1fr; gap: 6px; padding: 22px 0; }
+    .shots { grid-template-columns: 1fr; gap: 20px; }
+    .aside { position: static; }
+    section.block { padding: 60px 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .menu { animation: none; }
+    .btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- A Kolibri logó egyszer van definiálva, mindenhol erre hivatkozunk -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="kolibri" viewBox="0 0 512 512">
+    <polygon fill="#3a7ca5" points="236,246 300,236 404,96 468,40 440,170 352,282"/>
+    <polygon fill="#1b8f8a" points="236,246 300,236 404,96 330,270"/>
+    <polygon fill="#2ec4b6" points="300,236 404,96 468,40 380,210"/>
+    <polygon fill="#1b8f8a" points="330,372 372,318 462,444 418,478"/>
+    <polygon fill="#3a7ca5" points="330,372 372,318 420,470 372,440"/>
+    <polygon fill="#2ec4b6" points="206,262 236,222 312,252 372,318 330,372 246,332"/>
+    <polygon fill="#1b8f8a" points="206,262 246,332 330,372 290,300"/>
+    <polygon fill="#7ee0d6" points="236,222 312,252 290,300 222,270"/>
+    <polygon fill="#7ee0d6" points="120,232 152,192 206,186 240,222 222,270 162,270"/>
+    <polygon fill="#2ec4b6" points="152,192 206,186 240,222 186,226"/>
+    <polygon fill="#e8eef4" points="32,250 130,224 134,244"/>
+    <polygon fill="#f4b942" points="134,244 162,270 206,262 176,246"/>
+    <circle cx="176" cy="218" r="7" fill="#06111e"/>
+  </symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-5-5m5 5l5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header class="brandbar">
+  <div class="wrap">
+    <svg aria-hidden="true"><use href="#kolibri"/></svg>
+    <b>Kolibri Linux</b>
+  </div>
+</header>
+
+<!-- HERO -->
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <h1>Kolibri Linux</h1>
+      <p class="tagline">Stabil. Egyszerű. Kezdőbarát.</p>
+      <p class="hero-lead">
+        Debian alapú, magyar nyelvű Linux, amely megmutatja: a Linux nem bonyolult, csak más.
+        Alul a tálca, balra a Start menü, így az első percben otthon érzed magad.
+      </p>
+      <div class="cta">
+        <a href="https://sleepy.hu/letoltes.php" class="btn btn-outline">
+          <svg aria-hidden="true"><use href="#down"/></svg>Letöltés
+        </a>
+      </div>
+      <p class="hero-note">Telepítés nélkül, élő rendszerként vagy virtuális gépben is kipróbálhatod.</p>
+    </div>
+
+    <div class="desk" role="img" aria-label="A Kolibri Linux asztala: alul a tálca, balra a Start menü listanézetben.">
+      <svg class="ghost" aria-hidden="true"><use href="#kolibri"/></svg>
+      <div class="wall" aria-hidden="true">
+        <svg><use href="#kolibri"/></svg>
+        <b>Kolibri</b>
+        <span>Stabil. Egyszerű. Kezdőbarát.</span>
+      </div>
+
+      <div class="menu" aria-hidden="true">
+        <div class="search">Keresés…</div>
+        <ul>
+          <li class="on"><b style="background:#f26a3d">B</b>Brave</li>
+          <li><b style="background:var(--teal-l)">F</b>Fájlkezelő</li>
+          <li><b style="background:#6fb3f2">W</b>LibreOffice Writer</li>
+          <li><b style="background:#6bd08f">K</b>KeePassXC</li>
+          <li><b style="background:#8fa8ff">S</b>Signal</li>
+          <li><b style="background:var(--amber)">Be</b>Beállítások</li>
+        </ul>
+      </div>
+
+      <div class="bar" aria-hidden="true">
+        <div class="start"><svg><use href="#kolibri"/></svg></div>
+        <div class="launch" style="background:rgba(126,224,214,.2);color:var(--teal-l)">F</div>
+        <div class="launch" style="background:rgba(242,106,61,.22);color:#f59a7b">B</div>
+        <div class="task"><i></i>Brave</div>
+        <div class="grow"></div>
+        <div class="tray"><i></i><i></i><i></i></div>
+        <div class="clock">09:41<small>2026.10.14.</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MIÉRT -->
+<section class="block">
+  <div class="wrap">
+    <h2>Miért a Kolibri Linux?</h2>
+    <div class="rows">
+      <div class="row">
+        <h3>Debian-alapú stabilitás</h3>
+        <p>A Debian az egyik legmegbízhatóbb Linux-alap. A Kolibri Linux a stabil ágra épül, automatikus biztonsági frissítésekkel, és a Timeshift segítségével a rendszer bármikor visszaállítható.</p>
+      </div>
+      <div class="row">
+        <h3>Teljesen ingyenes</h3>
+        <p>Szabad, ingyenes és legálisan használható bárki számára. Nem kell licenc, nem kell regisztráció.</p>
+      </div>
+      <div class="row">
+        <h3>Kezdőbarát</h3>
+        <p>Windows-szerű asztal, magyar nyelv és billentyűzet alapból, egyszerű telepítő. A programokat egy grafikus szoftverközpontból, kattintásra telepítheted.</p>
+      </div>
+      <div class="row">
+        <h3>Titkosítás és adatvédelem</h3>
+        <p>A Signal, a Tuta Mail, a KeePassXC, a VeraCrypt és a Kleopatra már telepítve van, a tűzfal pedig alapból be van kapcsolva.</p>
+      </div>
+      <div class="row">
+        <h3>Haladóknak is</h3>
+        <p>Bash, rendszergazdai feladatok, scriptelés: a mélységre mindig van lehetőség.</p>
+      </div>
+      <div class="row">
+        <h3>Közösségi szemlélet</h3>
+        <p>A Linux világa az együttműködésről szól.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KINEK SZÓL -->
+<section class="block">
+  <div class="wrap">
+    <h2>Kinek szól?</h2>
+    <div class="who">
+      <ul class="who-list">
+        <li>
+          <b>Linuxszal ismerkedők</b>
+          <span>Még sosem próbáltál Linuxot? Ez a legjobb hely kezdeni: kézenfekvő beállítások, magyarázott alapok.</span>
+        </li>
+        <li>
+          <b>Diákok, tanulók</b>
+          <span>Programozás, informatika, kiberbiztonság: a Linux kiváló terep a tanulásra, és itt nem leszel egyedül.</span>
+        </li>
+        <li>
+          <b>Haladó felhasználók</b>
+          <span>Ismered már az alapokat? A Debian-alap rengeteg lehetőséget rejt a mélyebb felhasználáshoz.</span>
+        </li>
+        <li>
+          <b>Kíváncsiság</b>
+          <span>Érdekel, hogyan működik egy operációs rendszer? Próbáld ki kockázat nélkül, VirtualBoxban is futtatható.</span>
+        </li>
+      </ul>
+
+      <aside class="aside">
+        <h3>Debian-szív alatt</h3>
+        <p>
+          A Kolibri Linux alapja a Debian, az egyik leghosszabb múltú és legstabilabb Linux disztribúció.
+          Erre épülnek például az Ubuntu, a Linux Mint és sok más népszerű rendszer is. Ez megbízható alapot,
+          hatalmas csomagtárat és aktív közösséget jelent.
+        </p>
+        <ul class="chips">
+          <li>Debian 13</li>
+          <li>Xfce</li>
+          <li>apt</li>
+          <li>deb csomagok</li>
+          <li>Flatpak</li>
+          <li>systemd</li>
+          <li>bash</li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- KÉPERNYŐKÉPEK (a screenshots/ mappába tett fájlokat automatikusan megjeleníti; ha nincs kép, a szekció rejtve marad) -->
+<section class="block" id="kepek" hidden>
+  <div class="wrap">
+    <h2>Így néz ki</h2>
+    <p class="lead">Kattints egy képre a nagyításhoz.</p>
+    <div class="shots">
+      <figure>
+        <button type="button" aria-label="Az asztal: alul a tálca, balra a Start menü."><img src="screenshots/01-asztal.png" alt="Az asztal: alul a tálca, balra a Start menü."></button>
+        <figcaption>Az asztal</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="Az indítómenü (GRUB): a rendszer neve a listában is Kolibri Linux."><img src="screenshots/boot-menu.png" alt="Az indítómenü (GRUB): a rendszer neve a listában is Kolibri Linux."></button>
+        <figcaption>Az indítómenü (GRUB)</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="Az indítási képernyő (Plymouth): logó és haladássáv."><img src="screenshots/boot-splash.png" alt="Az indítási képernyő (Plymouth): logó és haladássáv."></button>
+        <figcaption>Az indítási képernyő</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="A Start menü listanézetben, a telepített programokkal."><img src="screenshots/02-start-menu.png" alt="A Start menü listanézetben, a telepített programokkal."></button>
+        <figcaption>A Start menü, a telepített programokkal.</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="A fájlkezelő."><img src="screenshots/03-fajlkezelo.png" alt="A fájlkezelő."></button>
+        <figcaption>A fájlkezelő.</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="A szoftverközpont: programok telepítése kattintásra."><img src="screenshots/04-szoftverkozpont.png" alt="A szoftverközpont: programok telepítése kattintásra."></button>
+        <figcaption>A szoftverközpont: programok telepítése kattintásra.</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="A LibreOffice, magyar felülettel."><img src="screenshots/05-libreoffice.png" alt="A LibreOffice, magyar felülettel."></button>
+        <figcaption>A LibreOffice, magyar felülettel.</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="A telepítő: pár lépés, és kész."><img src="screenshots/06-telepito.png" alt="A telepítő: pár lépés, és kész."></button>
+        <figcaption>A telepítő: pár lépés, és kész.</figcaption>
+      </figure>
+
+      <figure>
+        <button type="button" aria-label="Vezérlőpult"><img src="screenshots/07_controlpanel_1.png" alt="Vezérlőpult"></button>
+        <figcaption>Vezérlőpult</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="Vezérlőpult"><img src="screenshots/07_controlpanel_2.png" alt="Vezérlőpult"></button>
+        <figcaption>Vezérlőpult</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="Vezérlőpult"><img src="screenshots/07_controlpanel_3.png" alt="Vezérlőpult"></button>
+        <figcaption>Vezérlőpult</figcaption>
+      </figure>
+      <figure>
+        <button type="button" aria-label="Vezérlőpult"><img src="screenshots/07_controlpanel_4.png" alt="Vezérlőpult"></button>
+        <figcaption>Vezérlőpult</figcaption>
+      </figure>
+
+      <figure>
+        <button type="button" aria-label="Tűzfal"><img src="screenshots/08_firewall.png" alt="Tűzfal"></button>
+        <figcaption>Tűzfal</figcaption>
+      </figure>
+
+
+
+
+    </div>
+  </div>
+</section>
+
+<!-- ALKALMAZÁSOK -->
+<section class="block">
+  <div class="wrap">
+    <h2>Az első indítástól kész</h2>
+    <p class="lead">A legfontosabb programok már telepítve vannak. A LibreOffice a legfrissebb kiadás, és magától frissül.</p>
+    <div class="apps">
+      <ul class="chips">
+        <li><a href="https://brave.com/" target="_blank" rel="noopener">Brave</a></li>
+        <li><a href="https://hu.libreoffice.org/" target="_blank" rel="noopener">LibreOffice</a></li>
+        <li><a href="https://signal.org/hu/" target="_blank" rel="noopener">Signal</a></li>
+        <li><a href="https://tuta.com/hu" target="_blank" rel="noopener">Tuta</a></li>
+        <li><a href="https://keepassxc.org/" target="_blank" rel="noopener">KeePassXC</a></li>
+        <li><a href="https://www.openpgp.org/software/kleopatra/" target="_blank" rel="noopener">Kleopatra</a></li>
+        <li><a href="https://veracrypt.io/en/Home.html" target="_blank" rel="noopener">VeraCrypt</a></li>
+        <li><a href="https://nextcloud.com/" target="_blank" rel="noopener">Nextcloud kliens</a></li>
+        <li><a href="https://localsend.org/" target="_blank" rel="noopener">LocalSend</a></li>
+        <li><a href="https://www.geany.org/" target="_blank" rel="noopener">Geany</a></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- LETÖLTÉS -->
+<section class="block get">
+  <div class="wrap">
+    <svg class="bird" aria-hidden="true"><use href="#kolibri"/></svg>
+    <h2>Készen állsz a változásra?</h2>
+    <p class="lead">A Kolibri Linux letölthető, kipróbálható, szabadon terjeszthető. Nem kell hozzá semmi, csak kíváncsiság.</p>
+    <div class="cta">
+      <a href="https://sleepy.hu/letoltes.php" class="btn btn-outline">
+        <svg aria-hidden="true"><use href="#down"/></svg>Letöltés
+      </a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Kolibri Linux &copy; 2026, Major Szabolcs</span>
+    <a href="https://github.com/mszabi22/KolibriLinux" target="_blank" rel="noopener">Github</a>
+    <a href="https://sleepy.hu/kapcsolat.php" target="_self" rel="noopener">Kapcsolat</a>
+    <span class="dl-count" aria-live="polite">Letöltések: <b class="dl-n">…</b></span>
+  </div>
+</footer>
+
+
+<dialog id="lb" aria-label="Nagyított képernyőkép"><img alt=""><p></p></dialog>
+<script>
+/* A letöltésszámot kizárólag a láblécben jelenítjük meg. */
+(function () {
+  var nodes = document.querySelectorAll('.dl-n');
+  if (!nodes.length || !window.fetch) return;
+  fetch('https://sleepy.hu/letoltes.php?count=1', {cache: 'no-store', credentials: 'omit'})
+    .then(function (r) {
+      if (!r.ok) throw new Error('A számláló nem érhető el');
+      return r.json();
+    })
+    .then(function (d) {
+      var n = Number(d && d.count);
+      if (!Number.isSafeInteger(n) || n < 0) throw new Error('Érvénytelen számlálóadat');
+      nodes.forEach(function (el) { el.textContent = n.toLocaleString('hu-HU'); });
+    })
+    .catch(function () {
+      document.querySelectorAll('.dl-count').forEach(function (el) { el.hidden = true; });
+    });
+})();
+</script>
+<script>
+(function () {
+  var sec = document.getElementById('kepek');
+  if (!sec) return;
+  var figs = Array.prototype.slice.call(sec.querySelectorAll('figure'));
+  var loaded = 0, pending = figs.length;
+  function settle() { if (--pending === 0 && loaded > 0) sec.hidden = false; }
+  figs.forEach(function (f) {
+    var im = f.querySelector('img');
+    function ok() { loaded++; settle(); }
+    function fail() { f.hidden = true; settle(); }
+    if (im.complete) { (im.naturalWidth ? ok : fail)(); }
+    else { im.addEventListener('load', ok); im.addEventListener('error', fail); }
+  });
+  var lb = document.getElementById('lb');
+  sec.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !lb.showModal) return;
+    var im = b.querySelector('img');
+    lb.querySelector('img').src = im.src;
+    lb.querySelector('img').alt = im.alt;
+    lb.querySelector('p').textContent = im.alt;
+    lb.showModal();
+  });
+  lb.addEventListener('click', function () { lb.close(); });
+})();
+</script>
+</body>
+</html>
