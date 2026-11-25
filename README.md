@@ -10,7 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://drive.google.com/drive/folders/1QRUDmG91F10liZ2EVjozCtnPbFq07ill">Letöltés</a>
+  <a href="https://drive.google.com/drive/folders/1QRUDmG91F10liZ2EVjozCtnPbFq07ill">Letöltés</a> | 
+  <a href="https://github.com/mszabi22/KolibriLinux">Github</a>
 </p>
 
 ---
@@ -111,7 +112,3 @@ qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 \
 A Kolibri Linux a Debian GNU/Linux rendszerre épül, a benne található programok mindegyike a saját licence szerint használható. A Brave, a Signal és a további említett programok nevei a tulajdonosaik védjegyei, a projektnek nincs hivatalos kapcsolata velük.
 
 A projekt AI felhasználásával készült, annak képességeinek megismerése céljából.
-
-## Szerző
-
-© 2026 Major Szabolcs
